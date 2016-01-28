@@ -1,5 +1,5 @@
 set(WRAP_FILE PlumedPluginWrapper.cpp)
-set(MODULE_NAME Plumedplugin)
+set(MODULE_NAME openmmplumed)
 
 # Execute SWIG to generate source code for the Python module.
 
@@ -17,8 +17,8 @@ add_custom_command(
 # Compile the Python module.
 
 add_custom_target(PythonInstall DEPENDS "${WRAP_FILE}")
-set(PLUMEDPLUGIN_HEADER_DIR "${CMAKE_SOURCE_DIR}/openmmapi/include")
-set(PLUMEDPLUGIN_LIBRARY_DIR "${CMAKE_BINARY_DIR}")
+set(OPENMMPLUMED_HEADER_DIR "${CMAKE_SOURCE_DIR}/openmmapi/include")
+set(OPENMMPLUMED_LIBRARY_DIR "${CMAKE_BINARY_DIR}")
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/setup.py ${CMAKE_CURRENT_BINARY_DIR}/setup.py)
 add_custom_command(TARGET PythonInstall
     COMMAND "${PYTHON_EXECUTABLE}" setup.py build

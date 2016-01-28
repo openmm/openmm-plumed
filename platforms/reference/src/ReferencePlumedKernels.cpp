@@ -128,7 +128,6 @@ double ReferenceCalcPlumedForceKernel::execute(ContextImpl& context, bool includ
     plumed_cmd(plumedmain, "setMasses", &masses[0]);
     if (charges.size() > 0)
         plumed_cmd(plumedmain, "setCharges", &charges[0]);
-    double energy = 0;
     vector<RealVec>& pos = extractPositions(context);
     plumed_cmd(plumedmain, "setPositions", &pos[0][0]);
     vector<RealVec>& force = extractForces(context);
@@ -148,6 +147,7 @@ double ReferenceCalcPlumedForceKernel::execute(ContextImpl& context, bool includ
         plumed_cmd(plumedmain, "update", NULL);
         lastStepIndex = step;
     }
+    double energy = 0;
     plumed_cmd(plumedmain, "getBias", &energy);
     return energy;
 }
