@@ -31,95 +31,139 @@
 
 #include "CudaPlumedKernels.h"
 #include "CudaPlumedKernelSources.h"
+#include "openmm/NonbondedForce.h"
 #include "openmm/internal/ContextImpl.h"
 #include "openmm/cuda/CudaBondedUtilities.h"
 #include "openmm/cuda/CudaForceInfo.h"
+#include <cstring>
+#include <map>
 
 using namespace PlumedPlugin;
 using namespace OpenMM;
 using namespace std;
 
-class CudaPlumedForceInfo : public CudaForceInfo {
-public:
-    CudaPlumedForceInfo(const PlumedForce& force) : force(force) {
-    }
-    int getNumParticleGroups() {
-        return force.getNumBonds();
-    }
-    void getParticlesInGroup(int index, vector<int>& particles) {
-        int particle1, particle2;
-        double length, k;
-        force.getBondParameters(index, particle1, particle2, length, k);
-        particles.resize(2);
-        particles[0] = particle1;
-        particles[1] = particle2;
-    }
-    bool areGroupsIdentical(int group1, int group2) {
-        int particle1, particle2;
-        double length1, length2, k1, k2;
-        force.getBondParameters(group1, particle1, particle2, length1, k1);
-        force.getBondParameters(group2, particle1, particle2, length2, k2);
-        return (length1 == length2 && k1 == k2);
-    }
-private:
-    const PlumedForce& force;
-};
-
 CudaCalcPlumedForceKernel::~CudaCalcPlumedForceKernel() {
     cu.setAsCurrent();
-    if (params != NULL)
-        delete params;
+    if (plumedForces != NULL)
+        delete plumedForces;
 }
 
 void CudaCalcPlumedForceKernel::initialize(const System& system, const PlumedForce& force) {
     cu.setAsCurrent();
-    int numContexts = cu.getPlatformData().contexts.size();
-    int startIndex = cu.getContextIndex()*force.getNumBonds()/numContexts;
-    int endIndex = (cu.getContextIndex()+1)*force.getNumBonds()/numContexts;
-    numBonds = endIndex-startIndex;
-    if (numBonds == 0)
-        return;
-    vector<vector<int> > atoms(numBonds, vector<int>(2));
-    params = CudaArray::create<float2>(cu, numBonds, "bondParams");
-    vector<float2> paramVector(numBonds);
-    for (int i = 0; i < numBonds; i++) {
-        double length, k;
-        force.getBondParameters(startIndex+i, atoms[i][0], atoms[i][1], length, k);
-        paramVector[i] = make_float2((float) length, (float) k);
+    int elementSize = (cu.getUseDoublePrecision() ? sizeof(double) : sizeof(float));
+    plumedForces = new CudaArray(cu, 3*system.getNumParticles(), elementSize, "plumedForces");
+    map<string, string> defines;
+    defines["NUM_ATOMS"] = cu.intToString(cu.getNumAtoms());
+    defines["PADDED_NUM_ATOMS"] = cu.intToString(cu.getPaddedNumAtoms());
+    CUmodule module = cu.createModule(CudaPlumedKernelSources::plumedForce, defines);
+    addForcesKernel = cu.getKernel(module, "addForces");
+
+    // Construct and initialize the PLUMED interface object.
+
+    plumedmain = plumed_create();
+    hasInitialized = true;
+    int apiVersion;
+    plumed_cmd(plumedmain, "getApiVersion", &apiVersion);
+    if (apiVersion < 4)
+        throw OpenMMException("Unsupported API version.  Upgrade PLUMED to a newer version.");
+    int precision = 8;
+    plumed_cmd(plumedmain, "setRealPrecision", &precision);
+    double conversion = 1.0;
+    plumed_cmd(plumedmain, "setMDEnergyUnits", &conversion);
+    plumed_cmd(plumedmain, "setMDLengthUnits", &conversion);
+    plumed_cmd(plumedmain, "setMDTimeUnits", &conversion);
+    plumed_cmd(plumedmain, "setMDEngine", "OpenMM");
+    int numParticles = system.getNumParticles();
+    plumed_cmd(plumedmain, "setNatoms", &numParticles);
+    double dt = contextImpl.getIntegrator().getStepSize();
+    plumed_cmd(plumedmain, "setTimestep", &dt);
+    plumed_cmd(plumedmain, "init", NULL);
+    vector<char> scriptChars(force.getScript().size()+1);
+    strcpy(&scriptChars[0], force.getScript().c_str());
+    char* line = strtok(&scriptChars[0], "\r\n");
+    while (line != NULL) {
+        plumed_cmd(plumedmain, "readInputLine", line);
+        line = strtok(NULL, "\r\n");
     }
-    params->upload(paramVector);
-    map<string, string> replacements;
-    replacements["PARAMS"] = cu.getBondedUtilities().addArgument(params->getDevicePointer(), "float2");
-    cu.getBondedUtilities().addInteraction(atoms, cu.replaceStrings(CudaPlumedKernelSources::PlumedForce, replacements), force.getForceGroup());
-    cu.addForce(new CudaPlumedForceInfo(force));
+    usesPeriodic = system.usesPeriodicBoundaryConditions();
+
+    // Record the particle masses.
+
+    masses.resize(numParticles);
+    for (int i = 0; i < numParticles; i++)
+        masses[i] = system.getParticleMass(i);
+
+    // If there's a NonbondedForce, get charges from it.
+
+    for (int j = 0; j < system.getNumForces(); j++) {
+        const NonbondedForce* nonbonded = dynamic_cast<const NonbondedForce*>(&system.getForce(j));
+        if (nonbonded != NULL) {
+            charges.resize(numParticles);
+            double sigma, epsilon;
+            for (int i = 0; i < numParticles; i++)
+                nonbonded->getParticleParameters(i, charges[i], sigma, epsilon);
+        }
+    }
 }
 
 double CudaCalcPlumedForceKernel::execute(ContextImpl& context, bool includeForces, bool includeEnergy) {
-    return 0.0;
+    int numParticles = context.getSystem().getNumParticles();
+    CudaPlatform::PlatformData* data = reinterpret_cast<CudaPlatform::PlatformData*>(context.getPlatformData());
+    int step = data->stepCount;
+    plumed_cmd(plumedmain, "setStep", &step);
+    plumed_cmd(plumedmain, "setMasses", &masses[0]);
+    if (charges.size() > 0)
+        plumed_cmd(plumedmain, "setCharges", &charges[0]);
+    context.getPositions(positions);
+    plumed_cmd(plumedmain, "setPositions", &positions[0][0]);
+    forces.resize(numParticles);
+    Vec3 zero;
+    for (int i = 0; i < numParticles; i++)
+        forces[i] = zero;
+    plumed_cmd(plumedmain, "setForces", &forces[0][0]);
+    if (usesPeriodic) {
+        Vec3 boxVectors[3];
+        context.getPeriodicBoxVectors(boxVectors[0], boxVectors[1], boxVectors[2]);
+        plumed_cmd(plumedmain, "setBox", &boxVectors[0][0]);
+    }
+    double virial[9];
+    plumed_cmd(plumedmain, "setVirial", &virial);
+
+    // Calculate the forces and energy.
+
+    plumed_cmd(plumedmain, "prepareCalc", NULL);
+    plumed_cmd(plumedmain, "performCalcNoUpdate", NULL);
+    if (step != lastStepIndex) {
+        plumed_cmd(plumedmain, "update", NULL);
+        lastStepIndex = step;
+    }
+    double energy = 0;
+    plumed_cmd(plumedmain, "getBias", &energy);
+    
+    // Upload the forces to the device and add them in.
+    
+    if (cu.getUseDoublePrecision()) {
+        double* buffer = (double*) cu.getPinnedBuffer();
+        for (int i = 0; i < numParticles; ++i) {
+            const Vec3& p = forces[i];
+            buffer[3*i] = p[0];
+            buffer[3*i+1] = p[1];
+            buffer[3*i+2] = p[2];
+        }
+        plumedForces->upload(buffer);
+    }
+    else {
+        float* buffer = (float*) cu.getPinnedBuffer();
+        for (int i = 0; i < numParticles; ++i) {
+            const Vec3& p = forces[i];
+            buffer[3*i] = (float) p[0];
+            buffer[3*i+1] = (float) p[1];
+            buffer[3*i+2] = (float) p[2];
+        }
+        plumedForces->upload(buffer);
+    }
+    void* args[] = {&plumedForces->getDevicePointer(), &cu.getForce().getDevicePointer(), &cu.getAtomIndexArray().getDevicePointer()};
+    cu.executeKernel(addForcesKernel, args, cu.getNumAtoms());
+    return energy;
 }
 
-void CudaCalcPlumedForceKernel::copyParametersToContext(ContextImpl& context, const PlumedForce& force) {
-    cu.setAsCurrent();
-    int numContexts = cu.getPlatformData().contexts.size();
-    int startIndex = cu.getContextIndex()*force.getNumBonds()/numContexts;
-    int endIndex = (cu.getContextIndex()+1)*force.getNumBonds()/numContexts;
-    if (numBonds != endIndex-startIndex)
-        throw OpenMMException("updateParametersInContext: The number of bonds has changed");
-    if (numBonds == 0)
-        return;
-    
-    // Record the per-bond parameters.
-    
-    vector<float2> paramVector(numBonds);
-    for (int i = 0; i < numBonds; i++) {
-        int atom1, atom2;
-        double length, k;
-        force.getBondParameters(startIndex+i, atom1, atom2, length, k);
-        paramVector[i] = make_float2((float) length, (float) k);
-    }
-    params->upload(paramVector);
-    
-    // Mark that the current reordering may be invalid.
-    
-    cu.invalidateMolecules();
-}

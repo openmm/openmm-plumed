@@ -58,6 +58,6 @@ extern "C" OPENMM_EXPORT void registerPlumedReferenceKernelFactories() {
 KernelImpl* ReferencePlumedKernelFactory::createKernelImpl(std::string name, const Platform& platform, ContextImpl& context) const {
     ReferencePlatform::PlatformData& data = *static_cast<ReferencePlatform::PlatformData*>(context.getPlatformData());
     if (name == CalcPlumedForceKernel::Name())
-        return new ReferenceCalcPlumedForceKernel(name, platform);
+        return new ReferenceCalcPlumedForceKernel(name, platform, context);
     throw OpenMMException((std::string("Tried to create kernel with illegal kernel name '")+name+"'").c_str());
 }

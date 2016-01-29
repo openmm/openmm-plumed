@@ -9,7 +9,7 @@
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org.               *
  *                                                                            *
- * Portions copyright (c) 2014 Stanford University and the Authors.           *
+ * Portions copyright (c) 2016 Stanford University and the Authors.           *
  * Authors: Peter Eastman                                                     *
  * Contributors:                                                              *
  *                                                                            *
@@ -33,8 +33,11 @@
  * -------------------------------------------------------------------------- */
 
 #include "PlumedKernels.h"
+#include "openmm/internal/ContextImpl.h"
 #include "openmm/cuda/CudaContext.h"
 #include "openmm/cuda/CudaArray.h"
+#include "wrapper/Plumed.h"
+#include <vector>
 
 namespace PlumedPlugin {
 
@@ -43,8 +46,8 @@ namespace PlumedPlugin {
  */
 class CudaCalcPlumedForceKernel : public CalcPlumedForceKernel {
 public:
-    CudaCalcPlumedForceKernel(std::string name, const OpenMM::Platform& platform, OpenMM::CudaContext& cu, const OpenMM::System& system) :
-            CalcPlumedForceKernel(name, platform), hasInitializedKernel(false), cu(cu), system(system), params(NULL) {
+    CudaCalcPlumedForceKernel(std::string name, const OpenMM::Platform& platform, OpenMM::ContextImpl& contextImpl, OpenMM::CudaContext& cu) :
+            CalcPlumedForceKernel(name, platform), contextImpl(contextImpl), cu(cu), hasInitialized(false), plumedForces(NULL) {
     }
     ~CudaCalcPlumedForceKernel();
     /**
@@ -63,19 +66,16 @@ public:
      * @return the potential energy due to the force
      */
     double execute(OpenMM::ContextImpl& context, bool includeForces, bool includeEnergy);
-    /**
-     * Copy changed parameters over to a context.
-     *
-     * @param context    the context to copy parameters to
-     * @param force      the PlumedForce to copy the parameters from
-     */
-    void copyParametersToContext(OpenMM::ContextImpl& context, const PlumedForce& force);
 private:
-    int numBonds;
-    bool hasInitializedKernel;
+    plumed plumedmain;
+    bool hasInitialized, usesPeriodic;
+    OpenMM::ContextImpl& contextImpl;
     OpenMM::CudaContext& cu;
-    const OpenMM::System& system;
-    OpenMM::CudaArray* params;
+    OpenMM::CudaArray* plumedForces;
+    CUfunction addForcesKernel;
+    int lastStepIndex;
+    std::vector<double> masses, charges;
+    std::vector<OpenMM::Vec3> positions, forces;
 };
 
 } // namespace PlumedPlugin

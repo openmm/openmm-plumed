@@ -67,6 +67,6 @@ extern "C" OPENMM_EXPORT void registerPlumedCudaKernelFactories() {
 KernelImpl* CudaPlumedKernelFactory::createKernelImpl(std::string name, const Platform& platform, ContextImpl& context) const {
     CudaContext& cu = *static_cast<CudaPlatform::PlatformData*>(context.getPlatformData())->contexts[0];
     if (name == CalcPlumedForceKernel::Name())
-        return new CudaCalcPlumedForceKernel(name, platform, cu, context.getSystem());
+        return new CudaCalcPlumedForceKernel(name, platform, context, cu);
     throw OpenMMException((std::string("Tried to create kernel with illegal kernel name '")+name+"'").c_str());
 }

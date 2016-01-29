@@ -57,7 +57,7 @@ static RealVec* extractBoxVectors(ContextImpl& context) {
     return (RealVec*) data->periodicBoxVectors;
 }
 
-ReferenceCalcPlumedForceKernel::ReferenceCalcPlumedForceKernel(std::string name, const OpenMM::Platform& platform) : CalcPlumedForceKernel(name, platform), hasInitialized(false), lastStepIndex(0) {
+ReferenceCalcPlumedForceKernel::ReferenceCalcPlumedForceKernel(std::string name, const OpenMM::Platform& platform, OpenMM::ContextImpl& contextImpl) : CalcPlumedForceKernel(name, platform), contextImpl(contextImpl), hasInitialized(false), lastStepIndex(0) {
 }
 
 ReferenceCalcPlumedForceKernel::~ReferenceCalcPlumedForceKernel() {
@@ -66,60 +66,55 @@ ReferenceCalcPlumedForceKernel::~ReferenceCalcPlumedForceKernel() {
 }
 
 void ReferenceCalcPlumedForceKernel::initialize(const System& system, const PlumedForce& force) {
-    script = force.getScript();
+    // Construct and initialize the PLUMED interface object.
+
+    plumedmain = plumed_create();
+    hasInitialized = true;
+    int apiVersion;
+    plumed_cmd(plumedmain, "getApiVersion", &apiVersion);
+    if (apiVersion < 4)
+        throw OpenMMException("Unsupported API version.  Upgrade PLUMED to a newer version.");
+    int precision = 8;
+    plumed_cmd(plumedmain, "setRealPrecision", &precision);
+    double conversion = 1.0;
+    plumed_cmd(plumedmain, "setMDEnergyUnits", &conversion);
+    plumed_cmd(plumedmain, "setMDLengthUnits", &conversion);
+    plumed_cmd(plumedmain, "setMDTimeUnits", &conversion);
+    plumed_cmd(plumedmain, "setMDEngine", "OpenMM");
+    int numParticles = system.getNumParticles();
+    plumed_cmd(plumedmain, "setNatoms", &numParticles);
+    double dt = contextImpl.getIntegrator().getStepSize();
+    plumed_cmd(plumedmain, "setTimestep", &dt);
+    plumed_cmd(plumedmain, "init", NULL);
+    vector<char> scriptChars(force.getScript().size()+1);
+    strcpy(&scriptChars[0], force.getScript().c_str());
+    char* line = strtok(&scriptChars[0], "\r\n");
+    while (line != NULL) {
+        plumed_cmd(plumedmain, "readInputLine", line);
+        line = strtok(NULL, "\r\n");
+    }
+    usesPeriodic = system.usesPeriodicBoundaryConditions();
+
+    // Record the particle masses.
+
+    masses.resize(numParticles);
+    for (int i = 0; i < numParticles; i++)
+        masses[i] = system.getParticleMass(i);
+
+    // If there's a NonbondedForce, get charges from it.
+
+    for (int j = 0; j < system.getNumForces(); j++) {
+        const NonbondedForce* nonbonded = dynamic_cast<const NonbondedForce*>(&system.getForce(j));
+        if (nonbonded != NULL) {
+            charges.resize(numParticles);
+            double sigma, epsilon;
+            for (int i = 0; i < numParticles; i++)
+                nonbonded->getParticleParameters(i, charges[i], sigma, epsilon);
+        }
+    }
 }
 
 double ReferenceCalcPlumedForceKernel::execute(ContextImpl& context, bool includeForces, bool includeEnergy) {
-    if (!hasInitialized) {
-        // Construct and initialize the PLUMED interface object.
-
-        plumedmain = plumed_create();
-        int apiVersion;
-        plumed_cmd(plumedmain, "getApiVersion", &apiVersion);
-        if (apiVersion < 4)
-            throw OpenMMException("Unsupported API version.  Upgrade PLUMED to a newer version.");
-        hasInitialized = true;
-        int precision = 8;
-        plumed_cmd(plumedmain, "setRealPrecision", &precision);
-        double conversion = 1.0;
-        plumed_cmd(plumedmain, "setMDEnergyUnits", &conversion);
-        plumed_cmd(plumedmain, "setMDLengthUnits", &conversion);
-        plumed_cmd(plumedmain, "setMDTimeUnits", &conversion);
-        plumed_cmd(plumedmain, "setMDEngine", "OpenMM");
-        const System& system = context.getSystem();
-        int numParticles = system.getNumParticles();
-        plumed_cmd(plumedmain, "setNatoms", &numParticles);
-        double dt = context.getIntegrator().getStepSize();
-        plumed_cmd(plumedmain, "setTimestep", &dt);
-        plumed_cmd(plumedmain, "init", NULL);
-        vector<char> scriptChars(script.size()+1);
-        strcpy(&scriptChars[0], script.c_str());
-        char* line = strtok(&scriptChars[0], "\r\n");
-        while (line != NULL) {
-            plumed_cmd(plumedmain, "readInputLine", line);
-            line = strtok(NULL, "\r\n");
-        }
-        usesPeriodic = system.usesPeriodicBoundaryConditions();
-
-        // Record the particle masses.
-
-        masses.resize(numParticles);
-        for (int i = 0; i < numParticles; i++)
-            masses[i] = system.getParticleMass(i);
-
-        // If there's a NonbondedForce, get charges from it.
-
-        for (int j = 0; j < system.getNumForces(); j++) {
-            const NonbondedForce* nonbonded = dynamic_cast<const NonbondedForce*>(&system.getForce(j));
-            if (nonbonded != NULL) {
-                charges.resize(numParticles);
-                double sigma, epsilon;
-                for (int i = 0; i < numParticles; i++)
-                    nonbonded->getParticleParameters(i, charges[i], sigma, epsilon);
-            }
-        }
-    }
-
     // Pass the current state to PLUMED.
 
     ReferencePlatform::PlatformData* data = reinterpret_cast<ReferencePlatform::PlatformData*>(context.getPlatformData());

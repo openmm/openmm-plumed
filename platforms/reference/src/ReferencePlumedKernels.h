@@ -44,7 +44,7 @@ namespace PlumedPlugin {
  */
 class ReferenceCalcPlumedForceKernel : public CalcPlumedForceKernel {
 public:
-    ReferenceCalcPlumedForceKernel(std::string name, const OpenMM::Platform& platform);
+    ReferenceCalcPlumedForceKernel(std::string name, const OpenMM::Platform& platform, OpenMM::ContextImpl& contextImpl);
     ~ReferenceCalcPlumedForceKernel();
     /**
      * Initialize the kernel.
@@ -71,8 +71,8 @@ public:
     void copyParametersToContext(OpenMM::ContextImpl& context, const PlumedForce& force);
 private:
     plumed plumedmain;
-    std::string script;
     bool hasInitialized, usesPeriodic;
+    OpenMM::ContextImpl& contextImpl;
     int lastStepIndex;
     std::vector<double> masses, charges;
 };
