@@ -108,8 +108,7 @@ void CudaCalcPlumedForceKernel::initialize(const System& system, const PlumedFor
 
 double CudaCalcPlumedForceKernel::execute(ContextImpl& context, bool includeForces, bool includeEnergy) {
     int numParticles = context.getSystem().getNumParticles();
-    CudaPlatform::PlatformData* data = reinterpret_cast<CudaPlatform::PlatformData*>(context.getPlatformData());
-    int step = data->stepCount;
+    int step = cu.getStepCount();
     plumed_cmd(plumedmain, "setStep", &step);
     plumed_cmd(plumedmain, "setMasses", &masses[0]);
     if (charges.size() > 0)

@@ -47,7 +47,7 @@ namespace PlumedPlugin {
 class CudaCalcPlumedForceKernel : public CalcPlumedForceKernel {
 public:
     CudaCalcPlumedForceKernel(std::string name, const OpenMM::Platform& platform, OpenMM::ContextImpl& contextImpl, OpenMM::CudaContext& cu) :
-            CalcPlumedForceKernel(name, platform), contextImpl(contextImpl), cu(cu), hasInitialized(false), plumedForces(NULL) {
+            CalcPlumedForceKernel(name, platform), contextImpl(contextImpl), cu(cu), hasInitialized(false), plumedForces(NULL), lastStepIndex(0) {
     }
     ~CudaCalcPlumedForceKernel();
     /**
