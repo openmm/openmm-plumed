@@ -66,14 +66,29 @@ public:
      * @return the potential energy due to the force
      */
     double execute(OpenMM::ContextImpl& context, bool includeForces, bool includeEnergy);
+    /**
+     * The is called by the pre-computation to start the calculation running.
+     */
+    void beginComputation(bool includeForces, bool includeEnergy, int groups);
+    /**
+     * This is called by the worker thread to do the computation.
+     */
+    void executeOnWorkerThread();
+    /**
+     * This is called by the post-computation to add the forces to the main array.
+     */
+    double addForces(bool includeForces, bool includeEnergy, int groups);
 private:
+    class ExecuteTask;
+    class StartCalculationPreComputation;
+    class AddForcesPostComputation;
     plumed plumedmain;
     bool hasInitialized, usesPeriodic;
     OpenMM::ContextImpl& contextImpl;
     OpenMM::CudaContext& cu;
     OpenMM::CudaArray* plumedForces;
     CUfunction addForcesKernel;
-    int lastStepIndex;
+    int lastStepIndex, forceGroupFlag;
     std::vector<double> masses, charges;
     std::vector<OpenMM::Vec3> positions, forces;
 };

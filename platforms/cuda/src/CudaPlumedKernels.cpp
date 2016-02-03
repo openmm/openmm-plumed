@@ -6,7 +6,7 @@
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org.               *
  *                                                                            *
- * Portions copyright (c) 2014 Stanford University and the Authors.           *
+ * Portions copyright (c) 2016 Stanford University and the Authors.           *
  * Authors: Peter Eastman                                                     *
  * Contributors:                                                              *
  *                                                                            *
@@ -42,6 +42,36 @@ using namespace PlumedPlugin;
 using namespace OpenMM;
 using namespace std;
 
+class CudaCalcPlumedForceKernel::StartCalculationPreComputation : public CudaContext::ForcePreComputation {
+public:
+    StartCalculationPreComputation(CudaCalcPlumedForceKernel& owner) : owner(owner) {
+    }
+    void computeForceAndEnergy(bool includeForces, bool includeEnergy, int groups) {
+        owner.beginComputation(includeForces, includeEnergy, groups);
+    }
+    CudaCalcPlumedForceKernel& owner;
+};
+
+class CudaCalcPlumedForceKernel::ExecuteTask : public CudaContext::WorkTask {
+public:
+    ExecuteTask(CudaCalcPlumedForceKernel& owner) : owner(owner) {
+    }
+    void execute() {
+        owner.executeOnWorkerThread();
+    }
+    CudaCalcPlumedForceKernel& owner;
+};
+
+class CudaCalcPlumedForceKernel::AddForcesPostComputation : public CudaContext::ForcePostComputation {
+public:
+    AddForcesPostComputation(CudaCalcPlumedForceKernel& owner) : owner(owner) {
+    }
+    double computeForceAndEnergy(bool includeForces, bool includeEnergy, int groups) {
+        return owner.addForces(includeForces, includeEnergy, groups);
+    }
+    CudaCalcPlumedForceKernel& owner;
+};
+
 CudaCalcPlumedForceKernel::~CudaCalcPlumedForceKernel() {
     cu.setAsCurrent();
     if (plumedForces != NULL)
@@ -57,6 +87,9 @@ void CudaCalcPlumedForceKernel::initialize(const System& system, const PlumedFor
     defines["PADDED_NUM_ATOMS"] = cu.intToString(cu.getPaddedNumAtoms());
     CUmodule module = cu.createModule(CudaPlumedKernelSources::plumedForce, defines);
     addForcesKernel = cu.getKernel(module, "addForces");
+    forceGroupFlag = (1<<force.getForceGroup());
+    cu.addPreComputation(new StartCalculationPreComputation(*this));
+    cu.addPostComputation(new AddForcesPostComputation(*this));
 
     // Construct and initialize the PLUMED interface object.
 
@@ -107,22 +140,38 @@ void CudaCalcPlumedForceKernel::initialize(const System& system, const PlumedFor
 }
 
 double CudaCalcPlumedForceKernel::execute(ContextImpl& context, bool includeForces, bool includeEnergy) {
-    int numParticles = context.getSystem().getNumParticles();
+    // This method does nothing.  The actual calculation is started by the pre-computation, continued on
+    // the worker thread, and finished by the post-computation.
+    
+    return 0;
+}
+
+void CudaCalcPlumedForceKernel::beginComputation(bool includeForces, bool includeEnergy, int groups) {
+    if ((groups&forceGroupFlag) == 0)
+        return;
+    contextImpl.getPositions(positions);
+    
+    // The actual force computation will be done on a different thread.
+    
+    cu.getWorkThread().addTask(new ExecuteTask(*this));
+}
+
+void CudaCalcPlumedForceKernel::executeOnWorkerThread() {
+    // Configure the PLUMED interface object.
+    
+    int numParticles = contextImpl.getSystem().getNumParticles();
     int step = cu.getStepCount();
     plumed_cmd(plumedmain, "setStep", &step);
     plumed_cmd(plumedmain, "setMasses", &masses[0]);
     if (charges.size() > 0)
         plumed_cmd(plumedmain, "setCharges", &charges[0]);
-    context.getPositions(positions);
     plumed_cmd(plumedmain, "setPositions", &positions[0][0]);
     forces.resize(numParticles);
-    Vec3 zero;
-    for (int i = 0; i < numParticles; i++)
-        forces[i] = zero;
+    memset(&forces[0], 0, numParticles*sizeof(Vec3));
     plumed_cmd(plumedmain, "setForces", &forces[0][0]);
     if (usesPeriodic) {
         Vec3 boxVectors[3];
-        context.getPeriodicBoxVectors(boxVectors[0], boxVectors[1], boxVectors[2]);
+        contextImpl.getPeriodicBoxVectors(boxVectors[0], boxVectors[1], boxVectors[2]);
         plumed_cmd(plumedmain, "setBox", &boxVectors[0][0]);
     }
     double virial[9];
@@ -136,11 +185,10 @@ double CudaCalcPlumedForceKernel::execute(ContextImpl& context, bool includeForc
         plumed_cmd(plumedmain, "update", NULL);
         lastStepIndex = step;
     }
-    double energy = 0;
-    plumed_cmd(plumedmain, "getBias", &energy);
     
-    // Upload the forces to the device and add them in.
+    // Upload the forces to the device.
     
+    cu.setAsCurrent();
     if (cu.getUseDoublePrecision()) {
         double* buffer = (double*) cu.getPinnedBuffer();
         for (int i = 0; i < numParticles; ++i) {
@@ -161,8 +209,26 @@ double CudaCalcPlumedForceKernel::execute(ContextImpl& context, bool includeForc
         }
         plumedForces->upload(buffer);
     }
-    void* args[] = {&plumedForces->getDevicePointer(), &cu.getForce().getDevicePointer(), &cu.getAtomIndexArray().getDevicePointer()};
-    cu.executeKernel(addForcesKernel, args, cu.getNumAtoms());
-    return energy;
 }
 
+double CudaCalcPlumedForceKernel::addForces(bool includeForces, bool includeEnergy, int groups) {
+    if ((groups&forceGroupFlag) == 0)
+        return 0;
+
+    // Wait until executeOnWorkerThread() is finished.
+    
+    cu.getWorkThread().flush();
+
+    // Add in the forces.
+    
+    if (includeForces) {
+        void* args[] = {&plumedForces->getDevicePointer(), &cu.getForce().getDevicePointer(), &cu.getAtomIndexArray().getDevicePointer()};
+        cu.executeKernel(addForcesKernel, args, cu.getNumAtoms());
+    }
+    
+    // Return the energy.
+    
+    double energy = 0;
+    plumed_cmd(plumedmain, "getBias", &energy);
+    return energy;
+}
