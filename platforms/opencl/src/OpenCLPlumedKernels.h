@@ -33,8 +33,11 @@
  * -------------------------------------------------------------------------- */
 
 #include "PlumedKernels.h"
+#include "openmm/internal/ContextImpl.h"
 #include "openmm/opencl/OpenCLContext.h"
 #include "openmm/opencl/OpenCLArray.h"
+#include "wrapper/Plumed.h"
+#include <vector>
 
 namespace PlumedPlugin {
 
@@ -43,10 +46,9 @@ namespace PlumedPlugin {
  */
 class OpenCLCalcPlumedForceKernel : public CalcPlumedForceKernel {
 public:
-    OpenCLCalcPlumedForceKernel(std::string name, const OpenMM::Platform& platform, OpenMM::OpenCLContext& cl, const OpenMM::System& system) :
-            CalcPlumedForceKernel(name, platform), hasInitializedKernel(false), cl(cl), system(system), params(NULL) {
+    OpenCLCalcPlumedForceKernel(std::string name, const OpenMM::Platform& platform, OpenMM::ContextImpl& contextImpl, OpenMM::OpenCLContext& cl) :
+            CalcPlumedForceKernel(name, platform), contextImpl(contextImpl), cl(cl), hasInitialized(false), plumedForces(NULL), lastStepIndex(0) {
     }
-
     ~OpenCLCalcPlumedForceKernel();
     /**
      * Initialize the kernel.
@@ -65,18 +67,30 @@ public:
      */
     double execute(OpenMM::ContextImpl& context, bool includeForces, bool includeEnergy);
     /**
-     * Copy changed parameters over to a context.
-     *
-     * @param context    the context to copy parameters to
-     * @param force      the PlumedForce to copy the parameters from
+     * The is called by the pre-computation to start the calculation running.
      */
-    void copyParametersToContext(OpenMM::ContextImpl& context, const PlumedForce& force);
+    void beginComputation(bool includeForces, bool includeEnergy, int groups);
+    /**
+     * This is called by the worker thread to do the computation.
+     */
+    void executeOnWorkerThread();
+    /**
+     * This is called by the post-computation to add the forces to the main array.
+     */
+    double addForces(bool includeForces, bool includeEnergy, int groups);
 private:
-    int numBonds;
-    bool hasInitializedKernel;
+    class ExecuteTask;
+    class StartCalculationPreComputation;
+    class AddForcesPostComputation;
+    plumed plumedmain;
+    bool hasInitialized, usesPeriodic;
+    OpenMM::ContextImpl& contextImpl;
     OpenMM::OpenCLContext& cl;
-    const OpenMM::System& system;
-    OpenMM::OpenCLArray* params;
+    OpenMM::OpenCLArray* plumedForces;
+    cl::Kernel addForcesKernel;
+    int lastStepIndex, forceGroupFlag;
+    std::vector<double> masses, charges;
+    std::vector<OpenMM::Vec3> positions, forces;
 };
 
 } // namespace PlumedPlugin

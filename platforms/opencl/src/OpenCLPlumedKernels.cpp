@@ -6,7 +6,7 @@
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org.               *
  *                                                                            *
- * Portions copyright (c) 2014 Stanford University and the Authors.           *
+ * Portions copyright (c) 2016 Stanford University and the Authors.           *
  * Authors: Peter Eastman                                                     *
  * Contributors:                                                              *
  *                                                                            *
@@ -31,93 +31,203 @@
 
 #include "OpenCLPlumedKernels.h"
 #include "OpenCLPlumedKernelSources.h"
+#include "openmm/NonbondedForce.h"
 #include "openmm/internal/ContextImpl.h"
 #include "openmm/opencl/OpenCLBondedUtilities.h"
 #include "openmm/opencl/OpenCLForceInfo.h"
+#include <cstring>
+#include <map>
 
 using namespace PlumedPlugin;
 using namespace OpenMM;
 using namespace std;
 
-class OpenCLPlumedForceInfo : public OpenCLForceInfo {
+class OpenCLCalcPlumedForceKernel::StartCalculationPreComputation : public OpenCLContext::ForcePreComputation {
 public:
-    OpenCLPlumedForceInfo(const PlumedForce& force) : OpenCLForceInfo(0), force(force) {
+    StartCalculationPreComputation(OpenCLCalcPlumedForceKernel& owner) : owner(owner) {
     }
-    int getNumParticleGroups() {
-        return force.getNumBonds();
+    void computeForceAndEnergy(bool includeForces, bool includeEnergy, int groups) {
+        owner.beginComputation(includeForces, includeEnergy, groups);
     }
-    void getParticlesInGroup(int index, vector<int>& particles) {
-        int particle1, particle2;
-        double length, k;
-        force.getBondParameters(index, particle1, particle2, length, k);
-        particles.resize(2);
-        particles[0] = particle1;
-        particles[1] = particle2;
+    OpenCLCalcPlumedForceKernel& owner;
+};
+
+class OpenCLCalcPlumedForceKernel::ExecuteTask : public OpenCLContext::WorkTask {
+public:
+    ExecuteTask(OpenCLCalcPlumedForceKernel& owner) : owner(owner) {
     }
-    bool areGroupsIdentical(int group1, int group2) {
-        int particle1, particle2;
-        double length1, length2, k1, k2;
-        force.getBondParameters(group1, particle1, particle2, length1, k1);
-        force.getBondParameters(group2, particle1, particle2, length2, k2);
-        return (length1 == length2 && k1 == k2);
+    void execute() {
+        owner.executeOnWorkerThread();
     }
-private:
-    const PlumedForce& force;
+    OpenCLCalcPlumedForceKernel& owner;
+};
+
+class OpenCLCalcPlumedForceKernel::AddForcesPostComputation : public OpenCLContext::ForcePostComputation {
+public:
+    AddForcesPostComputation(OpenCLCalcPlumedForceKernel& owner) : owner(owner) {
+    }
+    double computeForceAndEnergy(bool includeForces, bool includeEnergy, int groups) {
+        return owner.addForces(includeForces, includeEnergy, groups);
+    }
+    OpenCLCalcPlumedForceKernel& owner;
 };
 
 OpenCLCalcPlumedForceKernel::~OpenCLCalcPlumedForceKernel() {
-    if (params != NULL)
-        delete params;
+    if (plumedForces != NULL)
+        delete plumedForces;
 }
 
 void OpenCLCalcPlumedForceKernel::initialize(const System& system, const PlumedForce& force) {
-    int numContexts = cl.getPlatformData().contexts.size();
-    int startIndex = cl.getContextIndex()*force.getNumBonds()/numContexts;
-    int endIndex = (cl.getContextIndex()+1)*force.getNumBonds()/numContexts;
-    numBonds = endIndex-startIndex;
-    if (numBonds == 0)
-        return;
-    vector<vector<int> > atoms(numBonds, vector<int>(2));
-    params = OpenCLArray::create<mm_float2>(cl, numBonds, "bondParams");
-    vector<mm_float2> paramVector(numBonds);
-    for (int i = 0; i < numBonds; i++) {
-        double length, k;
-        force.getBondParameters(startIndex+i, atoms[i][0], atoms[i][1], length, k);
-        paramVector[i] = mm_float2((cl_float) length, (cl_float) k);
+    int elementSize = (cl.getUseDoublePrecision() ? sizeof(double) : sizeof(float));
+    plumedForces = new OpenCLArray(cl, 3*system.getNumParticles(), elementSize, "plumedForces");
+    map<string, string> defines;
+    defines["NUM_ATOMS"] = cl.intToString(cl.getNumAtoms());
+    defines["PADDED_NUM_ATOMS"] = cl.intToString(cl.getPaddedNumAtoms());
+    cl::Program program = cl.createProgram(OpenCLPlumedKernelSources::plumedForce, defines);
+    addForcesKernel = cl::Kernel(program, "addForces");
+    forceGroupFlag = (1<<force.getForceGroup());
+    cl.addPreComputation(new StartCalculationPreComputation(*this));
+    cl.addPostComputation(new AddForcesPostComputation(*this));
+
+    // Construct and initialize the PLUMED interface object.
+
+    plumedmain = plumed_create();
+    hasInitialized = true;
+    int apiVersion;
+    plumed_cmd(plumedmain, "getApiVersion", &apiVersion);
+    if (apiVersion < 4)
+        throw OpenMMException("Unsupported API version.  Upgrade PLUMED to a newer version.");
+    int precision = 8;
+    plumed_cmd(plumedmain, "setRealPrecision", &precision);
+    double conversion = 1.0;
+    plumed_cmd(plumedmain, "setMDEnergyUnits", &conversion);
+    plumed_cmd(plumedmain, "setMDLengthUnits", &conversion);
+    plumed_cmd(plumedmain, "setMDTimeUnits", &conversion);
+    plumed_cmd(plumedmain, "setMDEngine", "OpenMM");
+    int numParticles = system.getNumParticles();
+    plumed_cmd(plumedmain, "setNatoms", &numParticles);
+    double dt = contextImpl.getIntegrator().getStepSize();
+    plumed_cmd(plumedmain, "setTimestep", &dt);
+    plumed_cmd(plumedmain, "init", NULL);
+    vector<char> scriptChars(force.getScript().size()+1);
+    strcpy(&scriptChars[0], force.getScript().c_str());
+    char* line = strtok(&scriptChars[0], "\r\n");
+    while (line != NULL) {
+        plumed_cmd(plumedmain, "readInputLine", line);
+        line = strtok(NULL, "\r\n");
     }
-    params->upload(paramVector);
-    map<string, string> replacements;
-    replacements["PARAMS"] = cl.getBondedUtilities().addArgument(params->getDeviceBuffer(), "float2");
-    cl.getBondedUtilities().addInteraction(atoms, cl.replaceStrings(OpenCLPlumedKernelSources::PlumedForce, replacements), force.getForceGroup());
-    cl.addForce(new OpenCLPlumedForceInfo(force));
+    usesPeriodic = system.usesPeriodicBoundaryConditions();
+
+    // Record the particle masses.
+
+    masses.resize(numParticles);
+    for (int i = 0; i < numParticles; i++)
+        masses[i] = system.getParticleMass(i);
+
+    // If there's a NonbondedForce, get charges from it.
+
+    for (int j = 0; j < system.getNumForces(); j++) {
+        const NonbondedForce* nonbonded = dynamic_cast<const NonbondedForce*>(&system.getForce(j));
+        if (nonbonded != NULL) {
+            charges.resize(numParticles);
+            double sigma, epsilon;
+            for (int i = 0; i < numParticles; i++)
+                nonbonded->getParticleParameters(i, charges[i], sigma, epsilon);
+        }
+    }
 }
 
 double OpenCLCalcPlumedForceKernel::execute(ContextImpl& context, bool includeForces, bool includeEnergy) {
-    return 0.0;
+    // This method does nothing.  The actual calculation is started by the pre-computation, continued on
+    // the worker thread, and finished by the post-computation.
+    
+    return 0;
 }
 
-void OpenCLCalcPlumedForceKernel::copyParametersToContext(ContextImpl& context, const PlumedForce& force) {
-    int numContexts = cl.getPlatformData().contexts.size();
-    int startIndex = cl.getContextIndex()*force.getNumBonds()/numContexts;
-    int endIndex = (cl.getContextIndex()+1)*force.getNumBonds()/numContexts;
-    if (numBonds != endIndex-startIndex)
-        throw OpenMMException("updateParametersInContext: The number of bonds has changed");
-    if (numBonds == 0)
+void OpenCLCalcPlumedForceKernel::beginComputation(bool includeForces, bool includeEnergy, int groups) {
+    if ((groups&forceGroupFlag) == 0)
         return;
+    contextImpl.getPositions(positions);
     
-    // Record the per-bond parameters.
+    // The actual force computation will be done on a different thread.
     
-    vector<mm_float2> paramVector(numBonds);
-    for (int i = 0; i < numBonds; i++) {
-        int atom1, atom2;
-        double length, k;
-        force.getBondParameters(startIndex+i, atom1, atom2, length, k);
-        paramVector[i] = mm_float2((cl_float) length, (cl_float) k);
-    }
-    params->upload(paramVector);
-    
-    // Mark that the current reordering may be invalid.
-    
-    cl.invalidateMolecules();
+    cl.getWorkThread().addTask(new ExecuteTask(*this));
 }
 
+void OpenCLCalcPlumedForceKernel::executeOnWorkerThread() {
+    // Configure the PLUMED interface object.
+    
+    int numParticles = contextImpl.getSystem().getNumParticles();
+    int step = cl.getStepCount();
+    plumed_cmd(plumedmain, "setStep", &step);
+    plumed_cmd(plumedmain, "setMasses", &masses[0]);
+    if (charges.size() > 0)
+        plumed_cmd(plumedmain, "setCharges", &charges[0]);
+    plumed_cmd(plumedmain, "setPositions", &positions[0][0]);
+    forces.resize(numParticles);
+    memset(&forces[0], 0, numParticles*sizeof(Vec3));
+    plumed_cmd(plumedmain, "setForces", &forces[0][0]);
+    if (usesPeriodic) {
+        Vec3 boxVectors[3];
+        contextImpl.getPeriodicBoxVectors(boxVectors[0], boxVectors[1], boxVectors[2]);
+        plumed_cmd(plumedmain, "setBox", &boxVectors[0][0]);
+    }
+    double virial[9];
+    plumed_cmd(plumedmain, "setVirial", &virial);
+
+    // Calculate the forces and energy.
+
+    plumed_cmd(plumedmain, "prepareCalc", NULL);
+    plumed_cmd(plumedmain, "performCalcNoUpdate", NULL);
+    if (step != lastStepIndex) {
+        plumed_cmd(plumedmain, "update", NULL);
+        lastStepIndex = step;
+    }
+    
+    // Upload the forces to the device.
+    
+    if (cl.getUseDoublePrecision()) {
+        double* buffer = (double*) cl.getPinnedBuffer();
+        for (int i = 0; i < numParticles; ++i) {
+            const Vec3& p = forces[i];
+            buffer[3*i] = p[0];
+            buffer[3*i+1] = p[1];
+            buffer[3*i+2] = p[2];
+        }
+        plumedForces->upload(buffer);
+    }
+    else {
+        float* buffer = (float*) cl.getPinnedBuffer();
+        for (int i = 0; i < numParticles; ++i) {
+            const Vec3& p = forces[i];
+            buffer[3*i] = (float) p[0];
+            buffer[3*i+1] = (float) p[1];
+            buffer[3*i+2] = (float) p[2];
+        }
+        plumedForces->upload(buffer);
+    }
+}
+
+double OpenCLCalcPlumedForceKernel::addForces(bool includeForces, bool includeEnergy, int groups) {
+    if ((groups&forceGroupFlag) == 0)
+        return 0;
+
+    // Wait until executeOnWorkerThread() is finished.
+    
+    cl.getWorkThread().flush();
+
+    // Add in the forces.
+    
+    if (includeForces) {
+        addForcesKernel.setArg<cl::Buffer>(0, plumedForces->getDeviceBuffer());
+        addForcesKernel.setArg<cl::Buffer>(1, cl.getForceBuffers().getDeviceBuffer());
+        addForcesKernel.setArg<cl::Buffer>(2, cl.getAtomIndexArray().getDeviceBuffer());
+        cl.executeKernel(addForcesKernel, cl.getNumAtoms());
+    }
+    
+    // Return the energy.
+    
+    double energy = 0;
+    plumed_cmd(plumedmain, "getBias", &energy);
+    return energy;
+}

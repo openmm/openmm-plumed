@@ -6,7 +6,7 @@
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org.               *
  *                                                                            *
- * Portions copyright (c) 2014 Stanford University and the Authors.           *
+ * Portions copyright (c) 2016 Stanford University and the Authors.           *
  * Authors: Peter Eastman                                                     *
  * Contributors:                                                              *
  *                                                                            *
@@ -30,17 +30,18 @@
  * -------------------------------------------------------------------------- */
 
 /**
- * This tests the Reference implementation of PlumedForce.
+ * This tests the CUDA implementation of PlumedForce.
  */
 
 #include "PlumedForce.h"
 #include "openmm/internal/AssertionUtilities.h"
 #include "openmm/Context.h"
+#include "openmm/CustomExternalForce.h"
+#include "openmm/LangevinIntegrator.h"
 #include "openmm/Platform.h"
 #include "openmm/System.h"
-#include "openmm/VerletIntegrator.h"
-#include <cmath>
 #include <iostream>
+#include <string>
 #include <vector>
 
 using namespace PlumedPlugin;
@@ -50,90 +51,71 @@ using namespace std;
 extern "C" OPENMM_EXPORT void registerPlumedOpenCLKernelFactories();
 
 void testForce() {
-    // Create a chain of particles connected by bonds.
-    
-    const int numBonds = 10;
-    const int numParticles = numBonds+1;
+    // Create a System that applies a force based on the distance between two atoms.
+
+    const int numParticles = 4;
     System system;
     vector<Vec3> positions(numParticles);
     for (int i = 0; i < numParticles; i++) {
         system.addParticle(1.0);
         positions[i] = Vec3(i, 0.1*i, -0.3*i);
     }
-    PlumedForce* force = new PlumedForce();
-    system.addForce(force);
-    for (int i = 0; i < numBonds; i++)
-        force->addBond(i, i+1, 1.0+sin(0.8*i), cos(0.3*i));
-    
+    string script =
+        "d: DISTANCE ATOMS=1,3\n"
+        "BIASVALUE ARG=d";
+    PlumedForce* plumed = new PlumedForce(script);
+    system.addForce(plumed);
+    LangevinIntegrator integ(300.0, 1.0, 1.0);
+    Platform& platform = Platform::getPlatformByName("OpenCL");
+    Context context(system, integ, platform);
+    context.setPositions(positions);
+
     // Compute the forces and energy.
 
-    VerletIntegrator integ(1.0);
-    Platform& platform = Platform::getPlatformByName("OpenCL");
-    Context context(system, integ, platform);
-    context.setPositions(positions);
     State state = context.getState(State::Energy | State::Forces);
-    
-    // See if the energy is correct.
-    
-    double expectedEnergy = 0;
-    for (int i = 0; i < numBonds; i++) {
-        double length = 1.0+sin(0.8*i);
-        double k = cos(0.3*i);
-        Vec3 delta = positions[i+1]-positions[i];
-        double dr = sqrt(delta.dot(delta))-length;
-        expectedEnergy += k*dr*dr*dr*dr;
-    }
-    ASSERT_EQUAL_TOL(expectedEnergy, state.getPotentialEnergy(), 1e-5);
-
-    // Validate the forces by moving each particle along each axis, and see if the energy changes by the correct amount.
-    
-    double offset = 1e-3;
-    for (int i = 0; i < numParticles; i++)
-        for (int j = 0; j < 3; j++) {
-            vector<Vec3> offsetPos = positions;
-            offsetPos[i][j] = positions[i][j]-offset;
-            context.setPositions(offsetPos);
-            double e1 = context.getState(State::Energy).getPotentialEnergy();
-            offsetPos[i][j] = positions[i][j]+offset;
-            context.setPositions(offsetPos);
-            double e2 = context.getState(State::Energy).getPotentialEnergy();
-            ASSERT_EQUAL_TOL(state.getForces()[i][j], (e1-e2)/(2*offset), 1e-3);
-        }
+    Vec3 delta = positions[0]-positions[2];
+    double dist = sqrt(delta.dot(delta));
+    ASSERT_EQUAL_TOL(dist, state.getPotentialEnergy(), 1e-5);
+    ASSERT_EQUAL_VEC(-delta/dist, state.getForces()[0], 1e-5);
+    ASSERT_EQUAL_VEC(Vec3(), state.getForces()[1], 1e-5);
+    ASSERT_EQUAL_VEC(delta/dist, state.getForces()[2], 1e-5);
+    ASSERT_EQUAL_VEC(Vec3(), state.getForces()[3], 1e-5);
 }
 
-void testChangingParameters() {
-    const double k = 1.5;
-    const double length = 0.5;
-    Platform& platform = Platform::getPlatformByName("OpenCL");
-    
-    // Create a system with one bond.
-    
+void testMetadynamics() {
+    // Create a System that does metadynamics within a one dimensional harmonic well.
+
     System system;
     system.addParticle(1.0);
-    system.addParticle(1.0);
-    PlumedForce* force = new PlumedForce();
-    force->addBond(0, 1, length, k);
-    system.addForce(force);
-    vector<Vec3> positions(2);
-    positions[0] = Vec3(1, 0, 0);
-    positions[1] = Vec3(2, 0, 0);
-    
-    // Check the energy.
-    
-    VerletIntegrator integ(1.0);
+    CustomExternalForce* external = new CustomExternalForce("x^2");
+    external->addParticle(0);
+    system.addForce(external);
+    string script =
+        "p: POSITION ATOM=1\n"
+        "METAD ARG=p.x SIGMA=0.5 HEIGHT=0.1 PACE=1";
+    PlumedForce* plumed = new PlumedForce(script);
+    system.addForce(plumed);
+    vector<Vec3> positions;
+    positions.push_back(Vec3());
+    LangevinIntegrator integ(300.0, 1.0, 1.0);
+    Platform& platform = Platform::getPlatformByName("OpenCL");
     Context context(system, integ, platform);
     context.setPositions(positions);
-    State state = context.getState(State::Energy);
-    ASSERT_EQUAL_TOL(k*pow(1.0-length, 4), state.getPotentialEnergy(), 1e-5);
-    
-    // Modify the parameters.
-    
-    const double k2 = 2.2;
-    const double length2 = 0.9;
-    force->setBondParameters(0, 0, 1, length2, k2);
-    force->updateParametersInContext(context);
-    state = context.getState(State::Energy);
-    ASSERT_EQUAL_TOL(k2*pow(1.0-length2, 4), state.getPotentialEnergy(), 1e-5);
+
+    // Run a short simulation and check the energy at each step.
+
+    vector<double> centers;
+    for (int i = 0; i < 100; i++) {
+        integ.step(1);
+        State state = context.getState(State::Positions | State::Energy);
+        double x = state.getPositions()[0][0];
+        double expected = x*x;
+        for (int j = 0; j < centers.size(); j++)
+            expected += 0.1*exp(-(x-centers[j])*(x-centers[j])/(2*0.5*0.5));
+        ASSERT_EQUAL_TOL(expected, state.getPotentialEnergy(), 1e-3);
+        if (i > 0)
+            centers.push_back(x);
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -142,7 +124,7 @@ int main(int argc, char* argv[]) {
         if (argc > 1)
             Platform::getPlatformByName("OpenCL").setPropertyDefaultValue("OpenCLPrecision", string(argv[1]));
         testForce();
-        testChangingParameters();
+        testMetadynamics();
     }
     catch(const std::exception& e) {
         std::cout << "exception: " << e.what() << std::endl;

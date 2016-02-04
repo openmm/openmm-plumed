@@ -6,7 +6,7 @@
  * Biological Structures at Stanford, funded under the NIH Roadmap for        *
  * Medical Research, grant U54 GM072970. See https://simtk.org.               *
  *                                                                            *
- * Portions copyright (c) 2014 Stanford University and the Authors.           *
+ * Portions copyright (c) 2016 Stanford University and the Authors.           *
  * Authors: Peter Eastman                                                     *
  * Contributors:                                                              *
  *                                                                            *
@@ -67,6 +67,6 @@ extern "C" OPENMM_EXPORT void registerPlumedOpenCLKernelFactories() {
 KernelImpl* OpenCLPlumedKernelFactory::createKernelImpl(std::string name, const Platform& platform, ContextImpl& context) const {
     OpenCLContext& cl = *static_cast<OpenCLPlatform::PlatformData*>(context.getPlatformData())->contexts[0];
     if (name == CalcPlumedForceKernel::Name())
-        return new OpenCLCalcPlumedForceKernel(name, platform, cl, context.getSystem());
+        return new OpenCLCalcPlumedForceKernel(name, platform, context, cl);
     throw OpenMMException((std::string("Tried to create kernel with illegal kernel name '")+name+"'").c_str());
 }
