@@ -80,6 +80,7 @@ public:
     double addForces(bool includeForces, bool includeEnergy, int groups);
 private:
     class ExecuteTask;
+    class CopyForcesTask;
     class StartCalculationPreComputation;
     class AddForcesPostComputation;
     plumed plumedmain;
@@ -88,6 +89,8 @@ private:
     OpenMM::CudaContext& cu;
     OpenMM::CudaArray* plumedForces;
     CUfunction addForcesKernel;
+    CUstream stream;
+    CUevent syncEvent;
     int lastStepIndex, forceGroupFlag;
     std::vector<double> masses, charges;
     std::vector<OpenMM::Vec3> positions, forces;

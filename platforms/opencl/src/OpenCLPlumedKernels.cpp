@@ -62,6 +62,40 @@ public:
     OpenCLCalcPlumedForceKernel& owner;
 };
 
+class OpenCLCalcPlumedForceKernel::CopyForcesTask : public ThreadPool::Task {
+public:
+    CopyForcesTask(OpenCLContext& cl, vector<Vec3>& forces) : cl(cl), forces(forces) {
+    }
+    void execute(ThreadPool& threads, int threadIndex) {
+        // Copy the forces applied by PLUMED to a buffer for uploading.  This is done in parallel for speed.
+        
+        int numParticles = cl.getNumAtoms();
+        int numThreads = threads.getNumThreads();
+        int start = threadIndex*numParticles/numThreads;
+        int end = (threadIndex+1)*numParticles/numThreads;
+        if (cl.getUseDoublePrecision()) {
+            double* buffer = (double*) cl.getPinnedBuffer();
+            for (int i = start; i < end; ++i) {
+                const Vec3& p = forces[i];
+                buffer[3*i] = p[0];
+                buffer[3*i+1] = p[1];
+                buffer[3*i+2] = p[2];
+            }
+        }
+        else {
+            float* buffer = (float*) cl.getPinnedBuffer();
+            for (int i = start; i < end; ++i) {
+                const Vec3& p = forces[i];
+                buffer[3*i] = (float) p[0];
+                buffer[3*i+1] = (float) p[1];
+                buffer[3*i+2] = (float) p[2];
+            }
+        }
+    }
+    OpenCLContext& cl;
+    vector<Vec3>& forces;
+};
+
 class OpenCLCalcPlumedForceKernel::AddForcesPostComputation : public OpenCLContext::ForcePostComputation {
 public:
     AddForcesPostComputation(OpenCLCalcPlumedForceKernel& owner) : owner(owner) {
@@ -78,6 +112,7 @@ OpenCLCalcPlumedForceKernel::~OpenCLCalcPlumedForceKernel() {
 }
 
 void OpenCLCalcPlumedForceKernel::initialize(const System& system, const PlumedForce& force) {
+    queue = cl::CommandQueue(cl.getContext(), cl.getDevice());
     int elementSize = (cl.getUseDoublePrecision() ? sizeof(double) : sizeof(float));
     plumedForces = new OpenCLArray(cl, 3*system.getNumParticles(), elementSize, "plumedForces");
     map<string, string> defines;
@@ -186,26 +221,10 @@ void OpenCLCalcPlumedForceKernel::executeOnWorkerThread() {
     
     // Upload the forces to the device.
     
-    if (cl.getUseDoublePrecision()) {
-        double* buffer = (double*) cl.getPinnedBuffer();
-        for (int i = 0; i < numParticles; ++i) {
-            const Vec3& p = forces[i];
-            buffer[3*i] = p[0];
-            buffer[3*i+1] = p[1];
-            buffer[3*i+2] = p[2];
-        }
-        plumedForces->upload(buffer);
-    }
-    else {
-        float* buffer = (float*) cl.getPinnedBuffer();
-        for (int i = 0; i < numParticles; ++i) {
-            const Vec3& p = forces[i];
-            buffer[3*i] = (float) p[0];
-            buffer[3*i+1] = (float) p[1];
-            buffer[3*i+2] = (float) p[2];
-        }
-        plumedForces->upload(buffer);
-    }
+    CopyForcesTask task(cl, forces);
+    cl.getPlatformData().threads.execute(task);
+    cl.getPlatformData().threads.waitForThreads();
+    queue.enqueueWriteBuffer(plumedForces->getDeviceBuffer(), CL_FALSE, 0, plumedForces->getSize()*plumedForces->getElementSize(), cl.getPinnedBuffer(), NULL, &syncEvent);
 }
 
 double OpenCLCalcPlumedForceKernel::addForces(bool includeForces, bool includeEnergy, int groups) {
@@ -215,6 +234,10 @@ double OpenCLCalcPlumedForceKernel::addForces(bool includeForces, bool includeEn
     // Wait until executeOnWorkerThread() is finished.
     
     cl.getWorkThread().flush();
+    vector<cl::Event> events(1);
+    events[0] = syncEvent;
+    syncEvent = cl::Event();
+    queue.enqueueWaitForEvents(events);
 
     // Add in the forces.
     

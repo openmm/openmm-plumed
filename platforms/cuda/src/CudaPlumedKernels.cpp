@@ -33,6 +33,7 @@
 #include "CudaPlumedKernelSources.h"
 #include "openmm/NonbondedForce.h"
 #include "openmm/internal/ContextImpl.h"
+#include "openmm/internal/ThreadPool.h"
 #include "openmm/cuda/CudaBondedUtilities.h"
 #include "openmm/cuda/CudaForceInfo.h"
 #include <cstring>
@@ -62,6 +63,41 @@ public:
     CudaCalcPlumedForceKernel& owner;
 };
 
+class CudaCalcPlumedForceKernel::CopyForcesTask : public ThreadPool::Task {
+public:
+    CopyForcesTask(CudaContext& cu, vector<Vec3>& forces) : cu(cu), forces(forces) {
+    }
+    void execute(ThreadPool& threads, int threadIndex) {
+        // Copy the forces applied by PLUMED to a buffer for uploading.  This is done in parallel for speed.
+        
+        cu.setAsCurrent();
+        int numParticles = cu.getNumAtoms();
+        int numThreads = threads.getNumThreads();
+        int start = threadIndex*numParticles/numThreads;
+        int end = (threadIndex+1)*numParticles/numThreads;
+        if (cu.getUseDoublePrecision()) {
+            double* buffer = (double*) cu.getPinnedBuffer();
+            for (int i = start; i < end; ++i) {
+                const Vec3& p = forces[i];
+                buffer[3*i] = p[0];
+                buffer[3*i+1] = p[1];
+                buffer[3*i+2] = p[2];
+            }
+        }
+        else {
+            float* buffer = (float*) cu.getPinnedBuffer();
+            for (int i = start; i < end; ++i) {
+                const Vec3& p = forces[i];
+                buffer[3*i] = (float) p[0];
+                buffer[3*i+1] = (float) p[1];
+                buffer[3*i+2] = (float) p[2];
+            }
+        }
+    }
+    CudaContext& cu;
+    vector<Vec3>& forces;
+};
+
 class CudaCalcPlumedForceKernel::AddForcesPostComputation : public CudaContext::ForcePostComputation {
 public:
     AddForcesPostComputation(CudaCalcPlumedForceKernel& owner) : owner(owner) {
@@ -76,10 +112,14 @@ CudaCalcPlumedForceKernel::~CudaCalcPlumedForceKernel() {
     cu.setAsCurrent();
     if (plumedForces != NULL)
         delete plumedForces;
+    cuStreamDestroy(stream);
+    cuEventDestroy(syncEvent);
 }
 
 void CudaCalcPlumedForceKernel::initialize(const System& system, const PlumedForce& force) {
     cu.setAsCurrent();
+    cuStreamCreate(&stream, CU_STREAM_NON_BLOCKING);
+    cuEventCreate(&syncEvent, CU_EVENT_DISABLE_TIMING);
     int elementSize = (cu.getUseDoublePrecision() ? sizeof(double) : sizeof(float));
     plumedForces = new CudaArray(cu, 3*system.getNumParticles(), elementSize, "plumedForces");
     map<string, string> defines;
@@ -188,27 +228,13 @@ void CudaCalcPlumedForceKernel::executeOnWorkerThread() {
     
     // Upload the forces to the device.
     
+    CopyForcesTask task(cu, forces);
+    cu.getPlatformData().threads.execute(task);
+    cu.getPlatformData().threads.waitForThreads();
     cu.setAsCurrent();
-    if (cu.getUseDoublePrecision()) {
-        double* buffer = (double*) cu.getPinnedBuffer();
-        for (int i = 0; i < numParticles; ++i) {
-            const Vec3& p = forces[i];
-            buffer[3*i] = p[0];
-            buffer[3*i+1] = p[1];
-            buffer[3*i+2] = p[2];
-        }
-        plumedForces->upload(buffer);
-    }
-    else {
-        float* buffer = (float*) cu.getPinnedBuffer();
-        for (int i = 0; i < numParticles; ++i) {
-            const Vec3& p = forces[i];
-            buffer[3*i] = (float) p[0];
-            buffer[3*i+1] = (float) p[1];
-            buffer[3*i+2] = (float) p[2];
-        }
-        plumedForces->upload(buffer);
-    }
+    cuMemcpyHtoDAsync(plumedForces->getDevicePointer(), cu.getPinnedBuffer(), plumedForces->getSize()*plumedForces->getElementSize(), stream);
+    cuEventRecord(syncEvent, stream);
+    
 }
 
 double CudaCalcPlumedForceKernel::addForces(bool includeForces, bool includeEnergy, int groups) {
@@ -218,6 +244,7 @@ double CudaCalcPlumedForceKernel::addForces(bool includeForces, bool includeEner
     // Wait until executeOnWorkerThread() is finished.
     
     cu.getWorkThread().flush();
+    cuStreamWaitEvent(cu.getCurrentStream(), syncEvent, 0);
 
     // Add in the forces.
     
