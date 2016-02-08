@@ -45,7 +45,8 @@ extern "C" void registerPlumedSerializationProxies();
 void testSerialization() {
     // Create a Force.
 
-    string script = "DISTANCE ATOMS=1,2";
+    string script = "d: DISTANCE ATOMS=1,3\n"
+                    "BIASVALUE ARG=d";
     PlumedForce force(script);
 
     // Serialize and then deserialize it.
