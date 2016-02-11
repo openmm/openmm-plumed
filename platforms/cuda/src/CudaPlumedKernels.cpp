@@ -70,7 +70,6 @@ public:
     void execute(ThreadPool& threads, int threadIndex) {
         // Copy the forces applied by PLUMED to a buffer for uploading.  This is done in parallel for speed.
         
-        cu.setAsCurrent();
         int numParticles = cu.getNumAtoms();
         int numThreads = threads.getNumThreads();
         int start = threadIndex*numParticles/numThreads;

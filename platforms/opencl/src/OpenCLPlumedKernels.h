@@ -80,7 +80,6 @@ public:
     double addForces(bool includeForces, bool includeEnergy, int groups);
 private:
     class ExecuteTask;
-    class CopyForcesTask;
     class StartCalculationPreComputation;
     class AddForcesPostComputation;
     plumed plumedmain;
