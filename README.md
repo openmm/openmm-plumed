@@ -40,6 +40,18 @@ and that PLUMED_BUILD_CUDA_LIB is selected.
 selected Unix Makefiles, type `make install` to install the plugin, and `make PythonInstall` to
 install the Python wrapper.
 
+Using The Plugin
+================
+
+Simply create a `PlumedForce` object, passing the Plumed control script as an argument to the
+constructor, then add it to your `System`.  For example,
+
+```Python
+script = """
+d: DISTANCE ATOMS=1,10
+METAD ARG=d SIGMA=0.2 HEIGHT=0.3 PACE=500"""
+system.addForce(PlumedForce(script))
+```
 
 License
 =======
