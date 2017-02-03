@@ -43,7 +43,7 @@ install the Python wrapper.
 Using The Plugin
 ================
 
-Simply create a `PlumedForce` object, passing the Plumed control script as an argument to the
+Simply create a `PlumedForce` object, passing the PLUMED control script as an argument to the
 constructor, then add it to your `System`.  For example,
 
 ```Python
@@ -52,6 +52,11 @@ d: DISTANCE ATOMS=1,10
 METAD ARG=d SIGMA=0.2 HEIGHT=0.3 PACE=500"""
 system.addForce(PlumedForce(script))
 ```
+
+Be aware that PLUMED numbers atoms starting from 1, whereas OpenMM numbers them starting from 0.
+The example above performs metadynamics based on the distance between atoms 0 and 9 (in OpenMM's
+numbering system).
+
 
 License
 =======
