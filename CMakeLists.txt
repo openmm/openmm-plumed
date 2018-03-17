@@ -15,7 +15,10 @@ SET(PLUMED_INCLUDE_DIR "/usr/local/include/plumed" CACHE PATH "Where the Plumed 
 INCLUDE_DIRECTORIES("${PLUMED_INCLUDE_DIR}")
 LINK_DIRECTORIES("${PLUMED_LIBRARY_DIR}")
 
-# set flags for linking on mac
+# Specify the C++ version we are building for.
+SET (CMAKE_CXX_STANDARD 11)
+
+# Set flags for linking on mac
 IF(APPLE)
     SET (CMAKE_INSTALL_NAME_DIR "@rpath")
     SET(EXTRA_COMPILE_FLAGS "-msse2 -stdlib=libc++")

@@ -55,7 +55,7 @@ public:
     const PlumedForce& getOwner() const {
         return owner;
     }
-    void updateContextState(OpenMM::ContextImpl& context) {
+    void updateContextState(OpenMM::ContextImpl& context, bool& forcesInvalid) {
         // This force field doesn't update the state directly.
     }
     double calcForcesAndEnergy(OpenMM::ContextImpl& context, bool includeForces, bool includeEnergy, int groups);
