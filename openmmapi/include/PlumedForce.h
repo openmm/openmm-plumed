@@ -77,10 +77,19 @@ public:
     bool usesPeriodicBoundaryConditions() const {
         return false;
     }
+    /**
+     * Set the C stream of the PLUMED log. By default it is set to `stdout`.
+     */
+    void setLogStream(FILE* stream);
+    /**
+     * Get the C sream of the PLUMED log.
+     */
+    FILE* getLogStream() const;
 protected:
     OpenMM::ForceImpl* createImpl() const;
 private:
     std::string script;
+    FILE* logStream;
 };
 
 } // namespace PlumedPlugin
