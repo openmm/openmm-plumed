@@ -86,11 +86,20 @@ public:
      * Get the C sream of the PLUMED log.
      */
     FILE* getLogStream() const;
+    /**
+     * Set PLUMED restarts. By default it is `false`.
+     */
+    void setRestart(bool restart);
+    /**
+     * Get PLUMED restart.
+     */
+    bool getRestart() const;
 protected:
     OpenMM::ForceImpl* createImpl() const;
 private:
     std::string script;
     FILE* logStream;
+    bool restart;
 };
 
 } // namespace PlumedPlugin
