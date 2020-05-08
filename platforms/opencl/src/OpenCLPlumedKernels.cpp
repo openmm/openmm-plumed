@@ -110,6 +110,8 @@ void OpenCLCalcPlumedForceKernel::initialize(const System& system, const PlumedF
     plumed_cmd(plumedmain, "setNatoms", &numParticles);
     double dt = contextImpl.getIntegrator().getStepSize();
     plumed_cmd(plumedmain, "setTimestep", &dt);
+    int restart = force.getRestart();
+    plumed_cmd(plumedmain, "setRestart", &restart);
     plumed_cmd(plumedmain, "init", NULL);
     vector<char> scriptChars(force.getScript().size()+1);
     strcpy(&scriptChars[0], force.getScript().c_str());
