@@ -34,6 +34,7 @@
 
 #include "openmm/Context.h"
 #include "openmm/Force.h"
+#include <cstdio>
 #include <string>
 #include "internal/windowsExportPlumed.h"
 
