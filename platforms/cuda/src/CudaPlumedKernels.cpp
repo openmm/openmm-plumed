@@ -145,6 +145,7 @@ void CudaCalcPlumedForceKernel::initialize(const System& system, const PlumedFor
     plumed_cmd(plumedmain, "setMDLengthUnits", &conversion);
     plumed_cmd(plumedmain, "setMDTimeUnits", &conversion);
     plumed_cmd(plumedmain, "setMDEngine", "OpenMM");
+    plumed_cmd(plumedmain, "setLog", force.getLogStream());
     int numParticles = system.getNumParticles();
     plumed_cmd(plumedmain, "setNatoms", &numParticles);
     double dt = contextImpl.getIntegrator().getStepSize();

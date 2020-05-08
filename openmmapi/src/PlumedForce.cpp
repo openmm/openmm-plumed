@@ -29,6 +29,7 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
+#include "openmm/OpenMMException.h"
 #include "PlumedForce.h"
 #include "internal/PlumedForceImpl.h"
 
@@ -36,11 +37,23 @@ using namespace PlumedPlugin;
 using namespace OpenMM;
 using namespace std;
 
-PlumedForce::PlumedForce(const string& script) : script(script) {
+PlumedForce::PlumedForce(const string& script) : script(script), logStream(stdout) {
 }
 
 const string& PlumedForce::getScript() const {
     return script;
+}
+
+void PlumedForce::setLogStream(FILE* stream) {
+
+    if (!stream)
+        throw OpenMMException("PlumedForce::setLogStream: the stream has to be open");
+
+    logStream = stream;
+}
+
+FILE* PlumedForce::getLogStream() const {
+    return logStream;
 }
 
 ForceImpl* PlumedForce::createImpl() const {
