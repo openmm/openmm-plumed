@@ -86,6 +86,9 @@ void ReferenceCalcPlumedForceKernel::initialize(const System& system, const Plum
     plumed_cmd(plumedmain, "setNatoms", &numParticles);
     double dt = contextImpl.getIntegrator().getStepSize();
     plumed_cmd(plumedmain, "setTimestep", &dt);
+    double kT = force.getKbT();
+    if (kT >= 0.0)
+        plumed_cmd(plumedmain,"setKbT",&kT);
     int restart = force.getRestart();
     plumed_cmd(plumedmain, "setRestart", &restart);
     plumed_cmd(plumedmain, "init", NULL);
