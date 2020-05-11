@@ -79,6 +79,15 @@ public:
         return false;
     }
     /**
+     * Set kT value (kJ/mol). A negative value means undefined and not passed to PLUMED.
+     * By default it is set to -1.
+     */
+    void setKbT(double KbT);
+    /**
+     * Get kT value (kJ/mol).
+     */
+    double getKbT() const;
+    /**
      * Set the C stream of the PLUMED log. By default it is set to `stdout`.
      */
     void setLogStream(FILE* stream);
@@ -98,6 +107,7 @@ protected:
     OpenMM::ForceImpl* createImpl() const;
 private:
     std::string script;
+    double kT;
     FILE* logStream;
     bool restart;
 };

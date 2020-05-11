@@ -37,12 +37,20 @@ using namespace PlumedPlugin;
 using namespace OpenMM;
 using namespace std;
 
-PlumedForce::PlumedForce(const string& script) : script(script), logStream(stdout),
-    restart(false) {
+PlumedForce::PlumedForce(const string& script) : script(script), kT(-1),
+    logStream(stdout), restart(false) {
 }
 
 const string& PlumedForce::getScript() const {
     return script;
+}
+
+void PlumedForce::setKbT(double kT_) {
+    kT = kT_;
+}
+
+double PlumedForce::getKbT() const {
+    return kT;
 }
 
 void PlumedForce::setLogStream(FILE* stream) {
