@@ -87,11 +87,11 @@ public:
      */
     FILE* getLogStream() const;
     /**
-     * Set PLUMED restarts. By default it is `false`.
+     * Set the state of PLUMED restart (https://www.plumed.org/doc-master/user-doc/html/_r_e_s_t_a_r_t.html). By default it is `false`.
      */
     void setRestart(bool restart);
     /**
-     * Get PLUMED restart.
+     * Get the state of PLUMED restart.
      */
     bool getRestart() const;
 protected:
