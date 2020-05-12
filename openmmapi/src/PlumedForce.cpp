@@ -37,7 +37,8 @@ using namespace PlumedPlugin;
 using namespace OpenMM;
 using namespace std;
 
-PlumedForce::PlumedForce(const string& script) : script(script), logStream(stdout) {
+PlumedForce::PlumedForce(const string& script) : script(script), logStream(stdout),
+    restart(false) {
 }
 
 const string& PlumedForce::getScript() const {
@@ -58,4 +59,12 @@ FILE* PlumedForce::getLogStream() const {
 
 ForceImpl* PlumedForce::createImpl() const {
     return new PlumedForceImpl(*this);
+}
+
+void PlumedForce::setRestart(bool restart_) {
+    restart = restart_;
+}
+
+bool PlumedForce::getRestart() const {
+    return restart;
 }
