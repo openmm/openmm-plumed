@@ -64,12 +64,19 @@ public:
      * Create a PlumedForce.
      *
      * @param script    the PLUMED input script
+     * @param isScriptFile  whether the script parameter is a file name or the script content
      */
-    PlumedForce(const std::string& script);
+    PlumedForce(const std::string& script, bool isScriptFile=false);
     /**
      * Get the PLUMED input script
      */
     const std::string& getScript() const;
+    /**
+     * Get whether the script is a file
+     */
+    bool getScriptFile() const {
+	return isScriptFile;
+    }
     /**
      * Returns true if the force uses periodic boundary conditions and false otherwise. Your force should implement this
      * method appropriately to ensure that `System.usesPeriodicBoundaryConditions()` works for all systems containing
@@ -98,6 +105,7 @@ protected:
     OpenMM::ForceImpl* createImpl() const;
 private:
     std::string script;
+    bool isScriptFile;
     FILE* logStream;
     bool restart;
 };

@@ -22,8 +22,9 @@ namespace PlumedPlugin {
 
 class PlumedForce : public OpenMM::Force {
 public:
-    PlumedForce(const std::string& script);
+    PlumedForce(const std::string& script, bool isScriptFile=false);
     const std::string& getScript() const;
+    const bool getScriptFile() const;
 };
 
 }

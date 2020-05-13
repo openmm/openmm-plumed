@@ -89,13 +89,19 @@ void ReferenceCalcPlumedForceKernel::initialize(const System& system, const Plum
     int restart = force.getRestart();
     plumed_cmd(plumedmain, "setRestart", &restart);
     plumed_cmd(plumedmain, "init", NULL);
+
     vector<char> scriptChars(force.getScript().size()+1);
     strcpy(&scriptChars[0], force.getScript().c_str());
-    char* line = strtok(&scriptChars[0], "\r\n");
-    while (line != NULL) {
-        plumed_cmd(plumedmain, "readInputLine", line);
-        line = strtok(NULL, "\r\n");
+    if(force.getScriptFile()) {
+        plumed_cmd(plumedmain, "read", &scriptChars[0]);
+    } else {
+        char* line = strtok(&scriptChars[0], "\r\n");
+        while (line != NULL) {
+            plumed_cmd(plumedmain, "readInputLine", line);
+            line = strtok(NULL, "\r\n");
+        }
     }
+
     usesPeriodic = system.usesPeriodicBoundaryConditions();
 
     // Record the particle masses.

@@ -47,6 +47,8 @@ Simply create a `PlumedForce` object, passing the PLUMED control script as an ar
 constructor, then add it to your `System`.  For example,
 
 ```Python
+from openmmplumed import PlumedForce
+
 script = """
 d: DISTANCE ATOMS=1,10
 METAD ARG=d SIGMA=0.2 HEIGHT=0.3 PACE=500"""
