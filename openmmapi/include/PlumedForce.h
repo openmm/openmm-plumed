@@ -79,14 +79,14 @@ public:
         return false;
     }
     /**
-     * Set kT value (kJ/mol). A negative value means undefined and not passed to PLUMED.
+     * Set temperature. A negative value means undefined and not passed to PLUMED.
      * By default it is set to -1.
      */
-    void setKbT(double KbT);
+    void setTemperature(double KbT);
     /**
-     * Get kT value (kJ/mol).
+     * Get temperature.
      */
-    double getKbT() const;
+    double getTemperature() const;
     /**
      * Set the C stream of the PLUMED log. By default it is set to `stdout`.
      */
@@ -107,7 +107,7 @@ protected:
     OpenMM::ForceImpl* createImpl() const;
 private:
     std::string script;
-    double kT;
+    double temperature;
     FILE* logStream;
     bool restart;
 };
