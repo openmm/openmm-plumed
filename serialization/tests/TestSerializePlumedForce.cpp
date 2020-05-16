@@ -49,9 +49,11 @@ void testSerialization() {
                     "BIASVALUE ARG=d";
     bool restart = true;
     double temperature = 42.0;
+    const std::vector<double> masses = {3.1, 4.1, 5.9};
     PlumedForce force(script);
     force.setRestart(restart);
     force.setTemperature(temperature);
+    force.setMasses(masses);
 
     // Serialize and then deserialize it.
 
@@ -65,6 +67,7 @@ void testSerialization() {
     ASSERT_EQUAL(script, force2.getScript());
     ASSERT_EQUAL(restart, force2.getRestart());
     ASSERT_EQUAL(temperature, force2.getTemperature());
+    ASSERT_EQUAL_CONTAINERS(masses, force2.getMasses());
 }
 
 int main() {
