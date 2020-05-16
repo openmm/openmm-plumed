@@ -129,8 +129,14 @@ void OpenCLCalcPlumedForceKernel::initialize(const System& system, const PlumedF
     // Record the particle masses.
 
     masses.resize(numParticles);
-    for (int i = 0; i < numParticles; i++)
-        masses[i] = system.getParticleMass(i);
+    const auto& plumedMasses = force.getMasses();
+    if (plumedMasses.size() == 0) // User System masses
+        for (int i = 0; i < numParticles; i++)
+            masses[i] = system.getParticleMass(i);
+    else if (plumedMasses.size() == numParticles) // User PLUMED masses
+        masses = plumedMasses;
+    else
+        throw OpenMMException("The number of PLUMED masses is different from the number of particles!");
 
     // If there's a NonbondedForce, get charges from it.
 
