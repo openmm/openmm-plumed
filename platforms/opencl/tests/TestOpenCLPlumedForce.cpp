@@ -40,6 +40,7 @@
 #include "openmm/LangevinIntegrator.h"
 #include "openmm/Platform.h"
 #include "openmm/System.h"
+#include "openmm/reference/SimTKOpenMMRealType.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -118,6 +119,57 @@ void testMetadynamics() {
     }
 }
 
+void testWellTemperedMetadynamics() {
+
+    // Simulation parameters
+    const double height0 = 0.1;
+    const double sigma = 0.5;
+    const double temperatue = 300.0;
+    const double delta_temperature = 30.0;
+    // Note: BIASFACTOR = temperature + delta_temperature / temperature,
+    //       so PLUMED has to know a temperature to compupute
+    //       delta_temperature from BIASFACTOR
+    //       (https://www.plumed.org/doc-master/user-doc/html/belfast-6.html).
+    const string script =
+        "p: POSITION ATOM=1\n"
+        "METAD ARG=p.x HEIGHT=0.1 SIGMA=0.5 BIASFACTOR=1.1 PACE=1";
+
+    // Create a system within a one dimensional harmonic potential
+    System system;
+    system.addParticle(1.0);
+    CustomExternalForce* external = new CustomExternalForce("x^2");
+    external->addParticle(0);
+    system.addForce(external);
+
+    // Create a well-tempered metadynamics simulation
+    PlumedForce* plumed = new PlumedForce(script);
+    plumed->setTemperature(temperatue); // This is tested here!
+    system.addForce(plumed);
+    LangevinIntegrator integ(temperatue, 1.0, 1.0);
+    Platform& platform = Platform::getPlatformByName("OpenCL");
+    Context context(system, integ, platform);
+    context.setPositions({Vec3()});
+
+    // Run the simulation and compare potential energy
+    vector<double> centers, heights;
+    for (int i = 0; i < 100; i++) {
+        integ.step(1);
+        State state = context.getState(State::Positions | State::Energy);
+        double x = state.getPositions()[0][0];
+
+        // Compute bias
+        double bias = 0;
+        for (int j = 0; j < centers.size(); j++)
+            bias += heights[j]*exp(-(x-centers[j])*(x-centers[j])/(2*sigma*sigma));
+        if (i > 0) {
+            centers.push_back(x);
+            heights.push_back(height0*exp(-bias/(delta_temperature*BOLTZ)));
+        }
+
+        ASSERT_EQUAL_TOL(bias + x*x, state.getPotentialEnergy(), 1e-3);
+    }
+}
+
 int main(int argc, char* argv[]) {
     try {
         registerPlumedOpenCLKernelFactories();
@@ -125,6 +177,7 @@ int main(int argc, char* argv[]) {
             Platform::getPlatformByName("OpenCL").setPropertyDefaultValue("OpenCLPrecision", string(argv[1]));
         testForce();
         testMetadynamics();
+        testWellTemperedMetadynamics();
     }
     catch(const std::exception& e) {
         std::cout << "exception: " << e.what() << std::endl;

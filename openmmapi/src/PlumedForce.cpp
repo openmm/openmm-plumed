@@ -37,12 +37,20 @@ using namespace PlumedPlugin;
 using namespace OpenMM;
 using namespace std;
 
-PlumedForce::PlumedForce(const string& script) : script(script), logStream(stdout),
-    restart(false) {
+PlumedForce::PlumedForce(const string& script) : script(script), temperature(-1),
+    logStream(stdout), restart(false) {
 }
 
 const string& PlumedForce::getScript() const {
     return script;
+}
+
+void PlumedForce::setTemperature(double temperature_) {
+    temperature = temperature_;
+}
+
+double PlumedForce::getTemperature() const {
+    return temperature;
 }
 
 void PlumedForce::setLogStream(FILE* stream) {

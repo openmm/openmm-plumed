@@ -47,7 +47,11 @@ void testSerialization() {
 
     string script = "d: DISTANCE ATOMS=1,3\n"
                     "BIASVALUE ARG=d";
+    bool restart = true;
+    double temperature = 42.0;
     PlumedForce force(script);
+    force.setRestart(restart);
+    force.setTemperature(temperature);
 
     // Serialize and then deserialize it.
 
@@ -59,6 +63,8 @@ void testSerialization() {
 
     PlumedForce& force2 = *copy;
     ASSERT_EQUAL(script, force2.getScript());
+    ASSERT_EQUAL(restart, force2.getRestart());
+    ASSERT_EQUAL(temperature, force2.getTemperature());
 }
 
 int main() {

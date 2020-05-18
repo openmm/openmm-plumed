@@ -41,16 +41,23 @@ PlumedForceProxy::PlumedForceProxy() : SerializationProxy("PlumedForce") {
 }
 
 void PlumedForceProxy::serialize(const void* object, SerializationNode& node) const {
-    node.setIntProperty("version", 2);
+    node.setIntProperty("version", 3);
     const PlumedForce& force = *reinterpret_cast<const PlumedForce*>(object);
     node.setStringProperty("script", force.getScript());
+    node.setDoubleProperty("temperature", force.getTemperature());
     node.setBoolProperty("restart", force.getRestart());
 }
 
 void* PlumedForceProxy::deserialize(const SerializationNode& node) const {
-    if (node.getIntProperty("version") != 2)
+    const int version = node.getIntProperty("version");
+    if (version < 1 || version > 3)
         throw OpenMMException("Unsupported version number");
+
     PlumedForce* force = new PlumedForce(node.getStringProperty("script"));
-    force->setRestart(node.getBoolProperty("restart"));
+    if (version > 1)
+        force->setRestart(node.getBoolProperty("restart"));
+    if (version > 2)
+        force->setTemperature(node.getDoubleProperty("temperature"));
+
     return force;
 }

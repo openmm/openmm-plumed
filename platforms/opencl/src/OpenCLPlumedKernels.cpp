@@ -35,6 +35,7 @@
 #include "openmm/internal/ContextImpl.h"
 #include "openmm/opencl/OpenCLBondedUtilities.h"
 #include "openmm/opencl/OpenCLForceInfo.h"
+#include "openmm/reference/SimTKOpenMMRealType.h"
 #include <cstring>
 #include <map>
 
@@ -110,6 +111,9 @@ void OpenCLCalcPlumedForceKernel::initialize(const System& system, const PlumedF
     plumed_cmd(plumedmain, "setNatoms", &numParticles);
     double dt = contextImpl.getIntegrator().getStepSize();
     plumed_cmd(plumedmain, "setTimestep", &dt);
+    double kT = force.getTemperature() * BOLTZ;
+    if (kT >= 0.0)
+        plumed_cmd(plumedmain, "setKbT", &kT);
     int restart = force.getRestart();
     plumed_cmd(plumedmain, "setRestart", &restart);
     plumed_cmd(plumedmain, "init", NULL);

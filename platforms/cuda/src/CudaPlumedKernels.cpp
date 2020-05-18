@@ -36,6 +36,7 @@
 #include "openmm/internal/ThreadPool.h"
 #include "openmm/cuda/CudaBondedUtilities.h"
 #include "openmm/cuda/CudaForceInfo.h"
+#include "openmm/reference/SimTKOpenMMRealType.h"
 #include <cstring>
 #include <map>
 
@@ -150,6 +151,9 @@ void CudaCalcPlumedForceKernel::initialize(const System& system, const PlumedFor
     plumed_cmd(plumedmain, "setNatoms", &numParticles);
     double dt = contextImpl.getIntegrator().getStepSize();
     plumed_cmd(plumedmain, "setTimestep", &dt);
+    double kT = force.getTemperature() * BOLTZ;
+    if (kT >= 0.0)
+        plumed_cmd(plumedmain, "setKbT", &kT);
     int restart = force.getRestart();
     plumed_cmd(plumedmain, "setRestart", &restart);
     plumed_cmd(plumedmain, "init", NULL);
