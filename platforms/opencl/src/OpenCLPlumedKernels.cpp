@@ -76,6 +76,8 @@ public:
 OpenCLCalcPlumedForceKernel::~OpenCLCalcPlumedForceKernel() {
     if (plumedForces != NULL)
         delete plumedForces;
+    if (hasInitialized)
+        plumed_finalize(plumedmain);
 }
 
 void OpenCLCalcPlumedForceKernel::initialize(const System& system, const PlumedForce& force) {

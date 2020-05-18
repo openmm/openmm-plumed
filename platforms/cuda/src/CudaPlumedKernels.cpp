@@ -114,6 +114,8 @@ CudaCalcPlumedForceKernel::~CudaCalcPlumedForceKernel() {
         delete plumedForces;
     cuStreamDestroy(stream);
     cuEventDestroy(syncEvent);
+    if (hasInitialized)
+        plumed_finalize(plumedmain);
 }
 
 void CudaCalcPlumedForceKernel::initialize(const System& system, const PlumedForce& force) {
