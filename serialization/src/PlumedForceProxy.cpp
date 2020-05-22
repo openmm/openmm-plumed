@@ -41,16 +41,19 @@ PlumedForceProxy::PlumedForceProxy() : SerializationProxy("PlumedForce") {
 }
 
 void PlumedForceProxy::serialize(const void* object, SerializationNode& node) const {
-    node.setIntProperty("version", 3);
+    node.setIntProperty("version", 4);
     const PlumedForce& force = *reinterpret_cast<const PlumedForce*>(object);
     node.setStringProperty("script", force.getScript());
     node.setDoubleProperty("temperature", force.getTemperature());
+    auto& particles = node.createChildNode("particles");
+    for (const auto& mass: force.getMasses())
+        particles.createChildNode("particle").setDoubleProperty("mass", mass);
     node.setBoolProperty("restart", force.getRestart());
 }
 
 void* PlumedForceProxy::deserialize(const SerializationNode& node) const {
     const int version = node.getIntProperty("version");
-    if (version < 1 || version > 3)
+    if (version < 1 || version > 4)
         throw OpenMMException("Unsupported version number");
 
     PlumedForce* force = new PlumedForce(node.getStringProperty("script"));
@@ -58,6 +61,12 @@ void* PlumedForceProxy::deserialize(const SerializationNode& node) const {
         force->setRestart(node.getBoolProperty("restart"));
     if (version > 2)
         force->setTemperature(node.getDoubleProperty("temperature"));
+    if (version > 3) {
+        std::vector<double> masses;
+        for (const auto& particle: node.getChildNode("particles").getChildren())
+            masses.push_back(particle.getDoubleProperty("mass"));
+        force->setMasses(masses);
+    }
 
     return force;
 }

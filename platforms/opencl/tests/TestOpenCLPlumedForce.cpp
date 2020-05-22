@@ -38,9 +38,11 @@
 #include "openmm/Context.h"
 #include "openmm/CustomExternalForce.h"
 #include "openmm/LangevinIntegrator.h"
+#include "openmm/NonbondedForce.h"
 #include "openmm/Platform.h"
 #include "openmm/System.h"
 #include "openmm/reference/SimTKOpenMMRealType.h"
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -170,6 +172,73 @@ void testWellTemperedMetadynamics() {
     }
 }
 
+void testMassesCharges() {
+
+    // Create a system with one paticle
+    System system;
+    system.addParticle(3.8); // Set mass
+    NonbondedForce* nonbonded = new NonbondedForce();
+    nonbonded->addParticle(-2.1, 0.0, 0.0); // Set charge
+    system.addForce(nonbonded);
+
+    // Setup PLUMED to write the mass and chage of the particles to a file
+    const string script = "DUMPMASSCHARGE ATOMS=@mdatoms FILE=mass_charge.txt";
+    PlumedForce* plumed = new PlumedForce(script);
+    system.addForce(plumed);
+
+    // Setup simulation
+    LangevinIntegrator integ(300.0, 1.0, 1.0);
+    Platform& platform = Platform::getPlatformByName("OpenCL");
+    Context context(system, integ, platform);
+
+    ifstream stream;
+    char header[100];
+    double _, mass, charge;
+
+    context.setPositions({Vec3()});
+    integ.step(2); // Need at least 2 step for dumping to work
+
+    // Parse the dumped file
+    stream.open("mass_charge.txt");
+    stream.getline(&header[0], 100);
+    stream >> _ >> mass >> charge;
+    stream.close();
+
+    // Chekc if the mass and change from System is used
+    ASSERT_EQUAL(mass, 3.8);
+    ASSERT_EQUAL(charge, -2.1);
+
+    // Set the PLUMED masses
+    plumed->setMasses({7.5});
+    context.reinitialize(true);
+    integ.step(2); // Need at least 2 step for dumping
+
+    // Parse the dumped file
+    stream.open("mass_charge.txt");
+    stream.getline(&header[0], 100);
+    stream >> _ >> mass >> charge;
+    stream.close();
+
+    // Chekc if the mass from PLUMED is used
+    ASSERT_EQUAL(mass, 7.5);
+    ASSERT_EQUAL(charge, -2.1);
+
+    // Reset the PLUMED masses
+    plumed->setMasses({});
+    context.reinitialize(true);
+    integ.step(2); // Need at least 2 step for dumping
+
+    // Parse the dumped file
+    stream.open("mass_charge.txt");
+    stream.getline(&header[0], 100);
+    stream >> _ >> mass >> charge;
+    stream.close();
+
+    // Chekc if the mass and change from System is used again
+    ASSERT_EQUAL(mass, 3.8);
+    ASSERT_EQUAL(charge, -2.1);
+}
+
 int main(int argc, char* argv[]) {
     try {
         registerPlumedOpenCLKernelFactories();
@@ -178,6 +247,7 @@ int main(int argc, char* argv[]) {
         testForce();
         testMetadynamics();
         testWellTemperedMetadynamics();
+        testMassesCharges();
     }
     catch(const std::exception& e) {
         std::cout << "exception: " << e.what() << std::endl;

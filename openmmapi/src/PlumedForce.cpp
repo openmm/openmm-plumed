@@ -53,6 +53,14 @@ double PlumedForce::getTemperature() const {
     return temperature;
 }
 
+void PlumedForce::setMasses(const std::vector<double>& masses_) {
+    masses = masses_;
+}
+
+const std::vector<double>& PlumedForce::getMasses() const {
+    return masses;
+}
+
 void PlumedForce::setLogStream(FILE* stream) {
 
     if (!stream)

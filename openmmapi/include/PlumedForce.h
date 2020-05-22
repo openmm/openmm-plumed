@@ -88,6 +88,20 @@ public:
      */
     double getTemperature() const;
     /**
+     * Set particle masses, messured in Dalton. If not set, the OpenMM::System
+     * masses are used.
+     *
+     * This is useful when the mass mass repartion of hydrogen bonds is
+     * applied, but PLUMED expects the physical masses for the CV definition
+     * (i.e. the center of mass).
+     */
+    void setMasses(const std::vector<double>& masses);
+    /**
+     * Get particle masses. An empty array means that the OpenMM::System masses
+     * are used.
+     */
+    const std::vector<double>& getMasses() const;
+    /**
      * Set the C stream of the PLUMED log. By default it is set to `stdout`.
      */
     void setLogStream(FILE* stream);
@@ -108,6 +122,7 @@ protected:
 private:
     std::string script;
     double temperature;
+    std::vector<double> masses;
     FILE* logStream;
     bool restart;
 };
