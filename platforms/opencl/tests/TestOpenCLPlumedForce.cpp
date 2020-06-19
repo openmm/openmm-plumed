@@ -78,11 +78,12 @@ void testForce() {
     State state = context.getState(State::Energy | State::Forces);
     Vec3 delta = positions[0]-positions[2];
     double dist = sqrt(delta.dot(delta));
+    Vec3 zero;
     ASSERT_EQUAL_TOL(dist, state.getPotentialEnergy(), 1e-5);
     ASSERT_EQUAL_VEC(-delta/dist, state.getForces()[0], 1e-5);
-    ASSERT_EQUAL_VEC(Vec3(), state.getForces()[1], 1e-5);
+    ASSERT_EQUAL_VEC(zero, state.getForces()[1], 1e-5);
     ASSERT_EQUAL_VEC(delta/dist, state.getForces()[2], 1e-5);
-    ASSERT_EQUAL_VEC(Vec3(), state.getForces()[3], 1e-5);
+    ASSERT_EQUAL_VEC(zero, state.getForces()[3], 1e-5);
 }
 
 void testMetadynamics() {
