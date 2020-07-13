@@ -254,7 +254,7 @@ void testScript() {
                           "PRINT ...\n"
                           "\n"
                           "  ARG=p.x,p.y,p.z\n"
-                          "  # A comment in the middle"
+                          "  # A comment in the middle\n"
                           "  STRIDE=10\n"
                           "...";
     PlumedForce* plumed = new PlumedForce(script);
@@ -264,6 +264,8 @@ void testScript() {
     LangevinIntegrator integ(300.0, 1.0, 1.0);
     Platform& platform = Platform::getPlatformByName("OpenCL");
     Context context(system, integ, platform);
+
+    // If the parser fails, an exception is thrown during the context creation
 }
 
 int main(int argc, char* argv[]) {
