@@ -93,12 +93,19 @@ void ReferenceCalcPlumedForceKernel::initialize(const System& system, const Plum
     int restart = force.getRestart();
     plumed_cmd(plumedmain, "setRestart", &restart);
     plumed_cmd(plumedmain, "init", NULL);
-    vector<char> scriptChars(force.getScript().size()+1);
-    strcpy(&scriptChars[0], force.getScript().c_str());
-    char* line = strtok(&scriptChars[0], "\r\n");
-    while (line != NULL) {
-        plumed_cmd(plumedmain, "readInputLine", line);
-        line = strtok(NULL, "\r\n");
+    if(apiVersion > 7) {
+        plumed_cmd(plumedmain, "readInputLines", force.getScript().c_str());
+    } else {
+        // NOTE: the comments and line continuation does not works
+        //       (https://github.com/plumed/plumed2/issues/571)
+        // TODO: remove this when PLUMED 2.6 support is dropped
+        vector<char> scriptChars(force.getScript().size()+1);
+        strcpy(&scriptChars[0], force.getScript().c_str());
+        char* line = strtok(&scriptChars[0], "\r\n");
+        while (line != NULL) {
+            plumed_cmd(plumedmain, "readInputLine", line);
+            line = strtok(NULL, "\r\n");
+        }
     }
     usesPeriodic = system.usesPeriodicBoundaryConditions();
 

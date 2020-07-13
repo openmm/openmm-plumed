@@ -240,6 +240,34 @@ void testMassesCharges() {
     ASSERT_EQUAL(charge, -2.1);
 }
 
+void testScript() {
+
+    // Create a system
+    System system;
+    system.addParticle(0);
+
+    // Setup PLUMED
+    const string script = "#Comment\n"
+                          "p: POSITION ATOM=1\n"
+                          "\n"
+                          "# More comments and empty lines\n"
+                          "PRINT ...\n"
+                          "\n"
+                          "  ARG=p.x,p.y,p.z\n"
+                          "  # A comment in the middle\n"
+                          "  STRIDE=10\n"
+                          "...";
+    PlumedForce* plumed = new PlumedForce(script);
+    system.addForce(plumed);
+
+    // Setup simulation
+    LangevinIntegrator integ(300.0, 1.0, 1.0);
+    Platform& platform = Platform::getPlatformByName("OpenCL");
+    Context context(system, integ, platform);
+
+    // If the parser fails, an exception is thrown during the context creation
+}
+
 int main(int argc, char* argv[]) {
     try {
         registerPlumedOpenCLKernelFactories();
@@ -249,6 +277,8 @@ int main(int argc, char* argv[]) {
         testMetadynamics();
         testWellTemperedMetadynamics();
         testMassesCharges();
+        testScript();
+
     }
     catch(const std::exception& e) {
         std::cout << "exception: " << e.what() << std::endl;
