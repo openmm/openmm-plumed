@@ -88,8 +88,6 @@ private:
     OpenMM::OpenCLContext& cl;
     OpenMM::OpenCLArray* plumedForces;
     cl::Kernel addForcesKernel;
-    cl::CommandQueue queue;
-    cl::Event syncEvent;
     int lastStepIndex, forceGroupFlag;
     std::vector<double> masses, charges;
     std::vector<OpenMM::Vec3> positions, forces;
