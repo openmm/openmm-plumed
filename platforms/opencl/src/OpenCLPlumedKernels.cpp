@@ -81,7 +81,6 @@ OpenCLCalcPlumedForceKernel::~OpenCLCalcPlumedForceKernel() {
 }
 
 void OpenCLCalcPlumedForceKernel::initialize(const System& system, const PlumedForce& force) {
-    queue = cl::CommandQueue(cl.getContext(), cl.getDevice());
     int elementSize = (cl.getUseDoublePrecision() ? sizeof(double) : sizeof(float));
     plumedForces = new OpenCLArray(cl, 3*system.getNumParticles(), elementSize, "plumedForces");
     map<string, string> defines;
@@ -227,7 +226,7 @@ void OpenCLCalcPlumedForceKernel::executeOnWorkerThread() {
             buffer[3*i+2] = (float) p[2];
         }
     }
-    queue.enqueueWriteBuffer(plumedForces->getDeviceBuffer(), CL_FALSE, 0, plumedForces->getSize()*plumedForces->getElementSize(), cl.getPinnedBuffer(), NULL, &syncEvent);
+    plumedForces->upload(cl.getPinnedBuffer(), false);
 }
 
 double OpenCLCalcPlumedForceKernel::addForces(bool includeForces, bool includeEnergy, int groups) {
@@ -237,10 +236,6 @@ double OpenCLCalcPlumedForceKernel::addForces(bool includeForces, bool includeEn
     // Wait until executeOnWorkerThread() is finished.
     
     cl.getWorkThread().flush();
-    vector<cl::Event> events(1);
-    events[0] = syncEvent;
-    syncEvent = cl::Event();
-    queue.enqueueWaitForEvents(events);
 
     // Add in the forces.
     
