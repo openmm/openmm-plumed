@@ -13,3 +13,4 @@ dependencies:
 - openmm
 - plumed >=2.7
 - khronos-opencl-icd-loader
+- pocl

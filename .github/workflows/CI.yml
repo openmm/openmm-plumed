@@ -125,7 +125,7 @@ jobs:
             fn=$(basename $f)
             echo "::group::$fn"
             summary+="\n${fn}: "
-            if [[ $fn == *Cuda* || $f == *OpenCL* ]]; then
+            if [[ $fn == *Cuda* ]]; then
               echo "Skipping $fn..."
               summary+="Skipped"
               echo "::endgroup::"
