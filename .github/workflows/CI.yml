@@ -110,6 +110,11 @@ jobs:
           make -j2 install
           make -j2 PythonInstall
 
+      - name: "Plugin information"
+        shell: bash -l {0}
+        run: |
+          python -c "import simtk.openmm as mm; print('---Loaded---', *mm.pluginLoadedLibNames, '---Failed---', *mm.Platform.getPluginLoadFailures(), sep='\n')"
+
       - name: "Test"
         shell: bash -l {0}
         run: |
