@@ -112,20 +112,25 @@ jobs:
       - name: "Test"
         shell: bash -l {0}
         run: |
-          cd build
-          find . -name "Test*"
           set +e
+          cd build
+          if [[ ${{ matrix.os }} == ubuntu-* ]]; then
+            test_files=$(find . -name "Test*" -executable -type f)
+          else
+            test_files=$(find . -name "Test*" -perm +0111 -type f)
+          fi
           summary=""
           exitcode=0
-          for f in Test*; do
-            echo "::group::$f"
-            summary+="\n${f}: "
-            if [[ $f == *Cuda* || $f == *OpenCL* ]]; then
-              echo "Skipping $f..."
+          for f in $test_files; do
+            fn=$(basename $f)
+            echo "::group::$fn"
+            summary+="\n${fn}: "
+            if [[ $fn == *Cuda* || $f == *OpenCL* ]]; then
+              echo "Skipping $fn..."
               summary+="Skipped"
               continue
             fi
-            echo "Running $f..."
+            echo "Running $fn..."
             ./${f}
             thisexitcode=$?
             if [[ $thisexitcode == 0 ]]; then summary+="OK"; else summary+="FAILED"; fi
