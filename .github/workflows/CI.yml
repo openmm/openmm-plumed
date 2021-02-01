@@ -109,12 +109,14 @@ jobs:
           make -j2 install
           make -j2 PythonInstall
 
-      - name: "Debug platforms"
+      - name: "Debug OpenCL on Linux"
         shell: bash -l {0}
+        if: startsWith(matrix.os, 'ubuntu')
         run: |
           set +e
           python -m simtk.testInstallation
           python -c "import simtk.openmm as mm; print('---Loaded---', *mm.pluginLoadedLibNames, '---Failed---', *mm.Platform.getPluginLoadFailures(), sep='\n')"
+          find build -name TestOpenCLPlumedForce -type f -exec ldd {} \;
 
       - name: "Test"
         shell: bash -l {0}
