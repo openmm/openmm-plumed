@@ -128,6 +128,7 @@ jobs:
             if [[ $fn == *Cuda* || $f == *OpenCL* ]]; then
               echo "Skipping $fn..."
               summary+="Skipped"
+              echo "::endgroup::"
               continue
             fi
             echo "Running $fn..."
