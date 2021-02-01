@@ -1,3 +1,7 @@
+[![GH Actions Status](https://github.com/openmm/openmm-plumed/workflows/CI/badge.svg)](https://github.com/openmm/openmm-plumed/actions?query=branch%3Amaster+workflow%3ACI)
+[![Conda](https://img.shields.io/conda/v/conda-forge/openmm-plumed.svg)](https://anaconda.org/conda-forge/openmm-plumed)
+[![Anaconda Cloud Badge](https://anaconda.org/conda-forge/openmm-plumed/badges/downloads.svg)](https://anaconda.org/conda-forge/openmm-plumed)
+
 OpenMM PLUMED Plugin
 =====================
 
