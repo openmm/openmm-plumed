@@ -113,6 +113,7 @@ jobs:
         shell: bash -l {0}
         run: |
           cd build
+          find . -name "Test*"
           set +e
           summary=""
           exitcode=0
