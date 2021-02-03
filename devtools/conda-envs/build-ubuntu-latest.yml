@@ -10,7 +10,6 @@ dependencies:
 - libx11-common-@CDT_NAME@-x86_64
 - libx11-@CDT_NAME@-x86_64
 - mesa-dri-drivers-@CDT_NAME@-x86_64
-- mesa-dri1-drivers-@CDT_NAME@-x86_64
 - mesa-libgl-@CDT_NAME@-x86_64
 - mesa-libgl-devel-@CDT_NAME@-x86_64
 # host
