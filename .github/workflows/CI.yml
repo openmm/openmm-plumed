@@ -115,7 +115,7 @@ jobs:
         run: |
           python -c "import simtk.openmm as mm; print('---Loaded---', *mm.pluginLoadedLibNames, '---Failed---', *mm.Platform.getPluginLoadFailures(), sep='\n')"
 
-      - name: "Test"
+      - name: "Test C++"
         shell: bash -l {0}
         run: |
           set +e
@@ -149,3 +149,9 @@ jobs:
           echo "-------"
           echo -e "${summary}"
           exit $exitcode
+
+      - name: "Test Python"
+        shell: bash -l {0}
+        run: |
+          cd python/tests
+          pytest -v Test*
