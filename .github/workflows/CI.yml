@@ -26,7 +26,7 @@ jobs:
             python-version: "3.6"
             os: ubuntu-latest
             gcc-version: "9"
-            cuda-version: "11.2"
+            cuda-version: "11.0"
             cdt-name: cos7  # CentOS sysroot: cuda 10.x needs cos6, 11+ needs cos7
             CMAKE_FLAGS: |
               -DPLUMED_BUILD_CUDA_LIB=ON \
