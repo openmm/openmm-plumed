@@ -24,7 +24,7 @@ jobs:
         include:
           - name: Linux CPU CUDA 11.0 Python 3.6
             python-version: "3.6"
-            os: ubuntu-latest
+            os: ubuntu-18.04
             gcc-version: "9"
             cuda-version: "11.0"
             cdt-name: cos7  # CentOS sysroot: cuda 10.x needs cos6, 11+ needs cos7
