@@ -24,7 +24,6 @@ jobs:
         include:
           - name: Linux CPU CUDA 11.8 Python 3.10
             os: ubuntu-22.04
-            enable_cuda: true
             python-version: "3.10"
             gcc-version: "9"
             cuda-version: "11.8"
@@ -36,19 +35,23 @@ jobs:
 
           - name: MacOS Intel CPU OpenCL Python 3.9
             os: macos-latest
-            enable_cuda: false
             python-version: "3.9"
             CMAKE_FLAGS: ""
 
     steps:
-      - uses: actions/checkout@v2
+      - name: Check out
+        uses: actions/checkout@v2
 
-      - name: Install CUDA Toolkit
+      - name: Install CUDA Toolkit (if needed)
+        if: startsWith(matrix.os, 'ubuntu')
         uses: Jimver/cuda-toolkit@v0.2.10
         with:
           cuda: ${{ matrix.cuda-version }}
           linux-local-args: '["--toolkit", "--override"]' # Need to install CUDA 10.2
-        if: ${{ matrix.enable_cuda }}
+
+      - name: Install MacOS SDK (if needed)
+        if: startsWith(matrix.os, 'macos')
+        run: source devtools/scripts/install_macos_sdk.sh
 
       - name: "Patch conda env (if needed)"
         if: startsWith(matrix.os, 'ubuntu')
@@ -66,16 +69,6 @@ jobs:
           environment-file: devtools/conda-envs/build-${{ matrix.os }}.yml
           auto-activate-base: false
           channels: conda-forge
-
-      - name: "Install CUDA on Ubuntu (if needed)"
-        if: matrix.cuda-version != ''
-        env:
-          CUDA_VERSION: ${{ matrix.cuda-version }}
-        run: source devtools/scripts/install_cuda.sh
-
-      - name: "Set SDK on MacOS (if needed)"
-        if: startsWith(matrix.os, 'macos')
-        run: source devtools/scripts/install_macos_sdk.sh
 
       - name: "Conda info"
         shell: bash -l {0}
