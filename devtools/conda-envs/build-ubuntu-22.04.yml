@@ -1,0 +1,17 @@
+channels:
+  - conda-forge
+dependencies:
+  - cmake >=3.20
+  - cudatoolkit 11.*
+  - gxx_linux-64 10.3.*
+  - make
+  - nvcc_linux-64 11.*
+  - ocl-icd
+  - openmm >=7.7
+  - pip
+  - pocl
+  - plumed >=2.7
+  - pytest
+  - python 3.10.*
+  - swig
+  - sysroot_linux-64 2.17
