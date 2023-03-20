@@ -1,17 +1,19 @@
+name: build
 channels:
   - conda-forge
 dependencies:
+  # build
   - cmake >=3.20
-  - cudatoolkit 11.*
+  - cudatoolkit 11.8.*
   - gxx_linux-64 10.3.*
   - make
-  - nvcc_linux-64 11.*
-  - ocl-icd
-  - openmm >=7.7
+  - nvcc_linux-64 11.8
   - pip
-  - pocl
-  - plumed >=2.7
-  - pytest
-  - python 3.10.*
   - swig
   - sysroot_linux-64 2.17
+  # host
+  - openmm 8.0.*
+  - plumed 2.7.*
+  - python 3.10.*
+# test
+  - pytest
