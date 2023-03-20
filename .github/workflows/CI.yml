@@ -23,8 +23,9 @@ jobs:
       matrix:
         include:
           - name: Linux CPU CUDA 11.0 Python 3.10
-            python-version: "3.10"
             os: ubuntu-22.04
+            enable_cuda: true
+            python-version: "3.10"
             gcc-version: "9"
             cuda-version: "11.0"
             cdt-name: cos7  # CentOS sysroot: cuda 10.x needs cos6, 11+ needs cos7
@@ -34,13 +35,21 @@ jobs:
               -DEXTRA_COMPILE_FLAGS="-L/usr/local/cuda/lib64/stubs -Wl,-rpath,/usr/local/cuda/lib64/stubs -Wl,-rpath-link,/usr/local/cuda/lib64/stubs"
 
           - name: MacOS Intel CPU OpenCL Python 3.9
-            python-version: "3.9"
             os: macos-latest
+            enable_cuda: false
+            python-version: "3.9"
             cuda-version: ""
             CMAKE_FLAGS: ""
 
     steps:
       - uses: actions/checkout@v2
+
+      - name: Install CUDA Toolkit
+        uses: Jimver/cuda-toolkit@v0.2.8
+        with:
+          cuda: ${{ matrix.cuda }}
+          linux-local-args: '["--toolkit", "--override"]' # Need to install CUDA 10.2
+        if: ${{ matrix.enable_cuda }}
 
       - name: "Patch conda env (if needed)"
         if: startsWith(matrix.os, 'ubuntu')
