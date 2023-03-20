@@ -22,12 +22,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Linux CPU CUDA 11.8 Python 3.10
+          - name: Linux (CUDA 11.8, OpenMM 8.0, PLUMED 2.7, Python 3.10)
             os: ubuntu-22.04
-            python-version: "3.10"
-            gcc-version: "9"
-            cuda-version: "11.8.0"
-            cdt-name: cos7  # CentOS sysroot: cuda 10.x needs cos6, 11+ needs cos7
+            cuda-version: 11.8.0
+            gcc-version: 11.3
+            nvcc-version: 11.8
+            openmm-version: 8.0
+            plumed-version: 2.7
+            python-version: 3.10
             CMAKE_FLAGS: |
               -DPLUMED_BUILD_CUDA_LIB=ON \
               -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda \
@@ -53,16 +55,19 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: source devtools/scripts/install_macos_sdk.sh
 
-      - name: "Patch conda env (if needed)"
+      - name: Prepare dependencies" (if needed)"
         if: startsWith(matrix.os, 'ubuntu')
         run: |
-          sed -i -e "s/@CDT_NAME@/${{ matrix.cdt-name }}/g" \
-                 -e "s/@GCC_VERSION@/${{ matrix.gcc-version }}.*/g" \
-                 -e "s/@CUDATOOLKIT_VERSION@/${{ matrix.cuda-version }}.*/g" \
+          sed -i -e "/cudatoolkit/c\  - cudatoolkit ${{ matrix.cuda-version }}" \
+                 -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc-version }}" \
+                 -e "/nvcc_linux-64/c\  - nvcc_linux-64 ${{ matrix.nvcc-version }}" \
+                 -e "/openmm/c\  - python ${{ matrix.openmm-version }}" \
+                 -e "/plumed/c\  - python ${{ matrix.plumed-version }}" \
+                 -e "/python/c\  - python ${{ matrix.python-version }}" \
                  devtools/conda-envs/build-${{ matrix.os }}.yml
 
-      - uses: conda-incubator/setup-miniconda@v2
-        name: "Prepare base dependencies"
+      - name: Install dependencies
+        uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: ${{ matrix.python-version }}
           activate-environment: build
