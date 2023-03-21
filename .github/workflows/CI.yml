@@ -108,37 +108,8 @@ jobs:
 
       - name: Test C++
         run: |
-          set +e
           cd build
-          if [[ ${{ matrix.os }} == ubuntu-* ]]; then
-            test_files=$(find . -name "Test*" -executable -type f)
-          else
-            test_files=$(find . -name "Test*" -perm +0111 -type f)
-          fi
-          summary=""
-          exitcode=0
-          for f in $test_files; do
-            fn=$(basename $f)
-            echo "::group::$fn"
-            summary+="\n${fn}: "
-            if [[ $fn == *Cuda* ]]; then
-              echo "Skipping $fn..."
-              summary+="Skipped"
-              echo "::endgroup::"
-              continue
-            fi
-            echo "Running $fn..."
-            ./${f}
-            thisexitcode=$?
-            if [[ $thisexitcode == 0 ]]; then summary+="OK"; else summary+="FAILED"; fi
-            ((exitcode+=$thisexitcode))
-            echo "::endgroup::"
-          done
-          echo "-------"
-          echo "Summary"
-          echo "-------"
-          echo -e "${summary}"
-          exit $exitcode
+          ctest -V -E TestCuda
 
       - name: Test Python
         run: |
