@@ -13,6 +13,9 @@ on:
     #   (from https://help.github.com/en/actions/reference/events-that-trigger-workflows#scheduled-events-schedule)
     - cron: "0 0 * * *"
 
+defaults:
+  run:
+    shell: bash -l {0}
 
 jobs:
   unix:
@@ -55,7 +58,7 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: source devtools/scripts/install_macos_sdk.sh
 
-      - name: Prepare dependencies" (if needed)"
+      - name: Prepare dependencies (if needed)
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           sed -i -e "/cudatoolkit/c\  - cudatoolkit ${{ matrix.cuda-version }}" \
@@ -76,18 +79,15 @@ jobs:
           channels: conda-forge
 
       - name: "Conda info"
-        shell: bash -l {0}
         run: |
           conda info -a
           conda list
 
       - name: Patch Plumed's Lepton location
-        shell: bash -l {0}
         run: |
           test -d ${CONDA_PREFIX}/include/plumed/lepton && mv ${CONDA_PREFIX}/include/plumed/lepton ${CONDA_PREFIX}/include/plumed/lepton.bak
 
       - name: "Configure build with CMake"
-        shell: bash -l {0}
         run: |
           mkdir build
           cd build
@@ -110,19 +110,16 @@ jobs:
             ${{ matrix.CMAKE_FLAGS }}
 
       - name: "Build"
-        shell: bash -l {0}
         run: |
           cd build
           make -j2 install
           make -j2 PythonInstall
 
       - name: "Plugin information"
-        shell: bash -l {0}
         run: |
           python -c "import simtk.openmm as mm; print('---Loaded---', *mm.pluginLoadedLibNames, '---Failed---', *mm.Platform.getPluginLoadFailures(), sep='\n')"
 
       - name: "Test C++"
-        shell: bash -l {0}
         run: |
           set +e
           cd build
@@ -157,7 +154,6 @@ jobs:
           exit $exitcode
 
       - name: "Test Python"
-        shell: bash -l {0}
         run: |
           cd python/tests
           pytest -v Test*
