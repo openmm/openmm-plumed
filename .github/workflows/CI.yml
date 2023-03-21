@@ -33,15 +33,10 @@ jobs:
             openmm-version: "8.0"
             plumed-version: "2.7"
             python-version: "3.10"
-            CMAKE_FLAGS: |
-              -DPLUMED_BUILD_CUDA_LIB=ON \
-              -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda \
-              -DEXTRA_COMPILE_FLAGS="-L/usr/local/cuda/lib64/stubs -Wl,-rpath,/usr/local/cuda/lib64/stubs -Wl,-rpath-link,/usr/local/cuda/lib64/stubs"
 
           - name: MacOS Intel CPU OpenCL Python 3.9
             os: macos-latest
             python-version: "3.9"
-            CMAKE_FLAGS: ""
 
     steps:
       - name: Check out
@@ -98,15 +93,11 @@ jobs:
 
           cmake .. \
             -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX} \
-            -DCMAKE_PREFIX_PATH=${CONDA_PREFIX} \
-            -DCMAKE_BUILD_TYPE=Release \
+            -DOPENCL_LIBRARY=${CONDA_PREFIX}/lib/libOpenCL${SHLIB_EXT} \
+            -DOPENCL_INCLUDE_DIR=${CONDA_PREFIX}/include \
             -DOPENMM_DIR=${CONDA_PREFIX} \
             -DPLUMED_INCLUDE_DIR=${CONDA_PREFIX}/include/plumed \
             -DPLUMED_LIBRARY_DIR=${CONDA_PREFIX}/lib \
-            -DPLUMED_BUILD_OPENCL_LIB=ON \
-            -DOPENCL_INCLUDE_DIR=${CONDA_PREFIX}/include \
-            -DOPENCL_LIBRARY=${CONDA_PREFIX}/lib/libOpenCL${SHLIB_EXT} \
-            ${{ matrix.CMAKE_FLAGS }}
 
           make install
           make PythonInstall
