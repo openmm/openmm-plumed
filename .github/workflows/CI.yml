@@ -93,8 +93,6 @@ jobs:
 
           cmake .. \
             -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX} \
-            -DOPENCL_LIBRARY=${CONDA_PREFIX}/lib/libOpenCL${SHLIB_EXT} \
-            -DOPENCL_INCLUDE_DIR=${CONDA_PREFIX}/include \
             -DOPENMM_DIR=${CONDA_PREFIX} \
             -DPLUMED_INCLUDE_DIR=${CONDA_PREFIX}/include/plumed \
             -DPLUMED_LIBRARY_DIR=${CONDA_PREFIX}/lib \
