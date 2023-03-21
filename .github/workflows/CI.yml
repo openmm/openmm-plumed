@@ -61,8 +61,8 @@ jobs:
           sed -i -e "/cudatoolkit/c\  - cudatoolkit ${{ matrix.cuda-version }}" \
                  -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc-version }}" \
                  -e "/nvcc_linux-64/c\  - nvcc_linux-64 ${{ matrix.nvcc-version }}" \
-                 -e "/openmm/c\  - python ${{ matrix.openmm-version }}" \
-                 -e "/plumed/c\  - python ${{ matrix.plumed-version }}" \
+                 -e "/openmm/c\  - openmm ${{ matrix.openmm-version }}" \
+                 -e "/plumed/c\  - plumed ${{ matrix.plumed-version }}" \
                  -e "/python/c\  - python ${{ matrix.python-version }}" \
                  devtools/conda-envs/build-${{ matrix.os }}.yml
 
