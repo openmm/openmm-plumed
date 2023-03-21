@@ -78,19 +78,18 @@ jobs:
           auto-activate-base: false
           channels: conda-forge
 
-      - name: "Conda info"
+      - name: Conda info
         run: |
           conda info -a
           conda list
 
-      - name: Patch Plumed's Lepton location
+      - name: Patch Plumed's Lepton
         run: |
           test -d ${CONDA_PREFIX}/include/plumed/lepton && mv ${CONDA_PREFIX}/include/plumed/lepton ${CONDA_PREFIX}/include/plumed/lepton.bak
 
-      - name: "Configure build with CMake"
+      - name: Configure, compile, and install
         run: |
-          mkdir build
-          cd build
+          mkdir build && cd build
 
           SHLIB_EXT=".so"
           if [[ ${{ matrix.os }} == macos-* ]]; then
@@ -109,17 +108,14 @@ jobs:
             -DOPENCL_LIBRARY=${CONDA_PREFIX}/lib/libOpenCL${SHLIB_EXT} \
             ${{ matrix.CMAKE_FLAGS }}
 
-      - name: "Build"
-        run: |
-          cd build
-          make -j2 install
-          make -j2 PythonInstall
+          make install
+          make PythonInstall
 
-      - name: "Plugin information"
+      - name: Plugin information
         run: |
           python -c "import simtk.openmm as mm; print('---Loaded---', *mm.pluginLoadedLibNames, '---Failed---', *mm.Platform.getPluginLoadFailures(), sep='\n')"
 
-      - name: "Test C++"
+      - name: Test C++
         run: |
           set +e
           cd build
@@ -153,7 +149,7 @@ jobs:
           echo -e "${summary}"
           exit $exitcode
 
-      - name: "Test Python"
+      - name: Test Python
         run: |
           cd python/tests
           pytest -v Test*
