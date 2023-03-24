@@ -23,6 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
+        # Latest supported versions
           - name: Linux (CUDA 11.8, OpenMM 8.0, PLUMED 2.7, Python 3.10)
             os: ubuntu-22.04
             cuda-version: "11.8.0"
@@ -31,6 +32,16 @@ jobs:
             openmm-version: "8.0"
             plumed-version: "2.7"
             python-version: "3.10"
+
+        # Oldest supported versions
+          - name: Linux (CUDA 11.2, OpenMM 7.7, PLUMED 2.7, Python 3.9)
+            os: ubuntu-22.04
+            cuda-version: "11.2.2"
+            gcc-version: "10.4"
+            nvcc-version: "11.2"
+            openmm-version: "7.7"
+            plumed-version: "2.7"
+            python-version: "3.9"
 
           - name: MacOS Intel CPU OpenCL Python 3.9
             os: macos-latest
