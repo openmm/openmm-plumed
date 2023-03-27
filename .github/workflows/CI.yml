@@ -44,7 +44,7 @@ jobs:
             python-version: "3.9"
 
           - name: MacOS Intel CPU OpenCL Python 3.9
-            os: macos-latest
+            os: macos-12
             python-version: "3.9"
 
     steps:
