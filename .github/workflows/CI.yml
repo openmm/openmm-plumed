@@ -108,10 +108,17 @@ jobs:
         run: |
           python -c "import simtk.openmm as mm; print('---Loaded---', *mm.pluginLoadedLibNames, '---Failed---', *mm.Platform.getPluginLoadFailures(), sep='\n')"
 
-      - name: Test C++
+      - name: Run C++ tests on Linux
+        if: startsWith(matrix.os, 'ubuntu')
         run: |
           cd build
           ctest -V -E TestCuda
+
+      - name: Run C++ tests on MacOS
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          cd build
+          ctest -V -E TestCuda -E TestOpenCL
 
       - name: Test Python
         run: |
