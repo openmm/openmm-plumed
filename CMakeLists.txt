@@ -2,7 +2,12 @@
 # OpenMM Plumed Plugin
 #----------------------------------------------------
 
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.20 FATAL_ERROR)
+
+# Set the library name
+SET(PLUMED_LIBRARY_NAME OpenMMPlumed)
+SET(SHARED_PLUMED_TARGET ${PLUMED_LIBRARY_NAME})
+PROJECT(${PLUMED_LIBRARY_NAME} LANGUAGES CXX)
 
 # We need to know where OpenMM is installed so we can access the headers and libraries.
 SET(OPENMM_DIR "/usr/local/openmm" CACHE PATH "Where OpenMM is installed")
@@ -36,10 +41,6 @@ ENDIF(${CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT})
 # The source is organized into subdirectories, but we handle them all from
 # this CMakeLists file rather than letting CMake visit them as SUBDIRS.
 SET(PLUMED_PLUGIN_SOURCE_SUBDIRS openmmapi serialization)
-
-# Set the library name
-SET(PLUMED_LIBRARY_NAME OpenMMPlumed)
-SET(SHARED_PLUMED_TARGET ${PLUMED_LIBRARY_NAME})
 
 # These are all the places to search for header files which are to be part of the API.
 SET(API_INCLUDE_DIRS "openmmapi/include" "openmmapi/include/internal")
