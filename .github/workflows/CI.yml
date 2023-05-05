@@ -89,7 +89,7 @@ jobs:
       - name: Add an extra channel (if needed)
         if: startsWith(matrix.os, 'ubuntu') && matrix.extra-channel != ''
         run: |
-          sed -i -e "/^channels:$/a   - ${{ matrix.extra-channel }}" \
+          sed -i -e "/^channels:$/a   - ${{ matrix.extra-channel }}\n" \
                  devtools/conda-envs/build-${{ matrix.os }}.yml
 
       - name: Install dependencies
