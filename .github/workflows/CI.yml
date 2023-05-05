@@ -75,12 +75,6 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: source devtools/scripts/install_macos_sdk.sh
 
-      - name: Add an extra channel (if needed)
-        if: startsWith(matrix.os, 'ubuntu') && matrix.extra-channel != ''
-        run: |
-          sed -i -e "/^channels:$/a   - ${{matrix.extra-channel}}" \
-                 devtools/conda-envs/build-${{ matrix.os }}.yml
-
       - name: Prepare dependencies (if needed)
         if: startsWith(matrix.os, 'ubuntu')
         run: |
@@ -90,6 +84,12 @@ jobs:
                  -e "/openmm/c\  - openmm ${{ matrix.openmm-version }}" \
                  -e "/plumed/c\  - plumed ${{ matrix.plumed-version }}" \
                  -e "/python/c\  - python ${{ matrix.python-version }}" \
+                 devtools/conda-envs/build-${{ matrix.os }}.yml
+
+      - name: Add an extra channel (if needed)
+        if: startsWith(matrix.os, 'ubuntu') && matrix.extra-channel != ''
+        run: |
+          sed -i -e "/^channels:$/a   - ${{ matrix.extra-channel }}" \
                  devtools/conda-envs/build-${{ matrix.os }}.yml
 
       - name: Install dependencies
