@@ -8,11 +8,12 @@ on:
     branches:
       - "master"
   schedule:
-    # Nightly tests run on master by default:
-    #   Scheduled workflows run on the latest commit on the default or base branch.
-    #   (from https://help.github.com/en/actions/reference/events-that-trigger-workflows#scheduled-events-schedule)
-    - cron: "0 0 * * *"
+    # Run every Sunday at midnight
+    - cron:  '0 0 * * 0'
 
+defaults:
+  run:
+    shell: bash -l {0}
 
 jobs:
   unix:
@@ -22,36 +23,80 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Linux CPU CUDA 11.0 Python 3.6
-            python-version: "3.6"
-            os: ubuntu-latest
-            gcc-version: "9"
-            cuda-version: "11.0"
-            cdt-name: cos7  # CentOS sysroot: cuda 10.x needs cos6, 11+ needs cos7
-            CMAKE_FLAGS: |
-              -DPLUMED_BUILD_CUDA_LIB=ON \
-              -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda \
-              -DEXTRA_COMPILE_FLAGS="-L/usr/local/cuda/lib64/stubs -Wl,-rpath,/usr/local/cuda/lib64/stubs -Wl,-rpath-link,/usr/local/cuda/lib64/stubs"
+        # Bleeding edge
+          - name: Linux (CUDA 11.8, OpenMM dev, PLUMED 2.7, Python 3.*)
+            os: ubuntu-22.04
+            extra-channel: "conda-forge/label/openmm_dev"
+            cuda-version: "11.8.0"
+            gcc-version: "11.3"
+            nvcc-version: "11.8"
+            openmm-version: "*"
+            plumed-version: "2.7"
+            python-version: "3.*"
 
-          - name: MacOS Intel CPU OpenCL Python 3.9
+        # Latest supported versions
+          - name: Linux (CUDA 11.8, OpenMM 8.0, PLUMED 2.7, Python 3.10)
+            os: ubuntu-22.04
+            extra-channel: ""
+            cuda-version: "11.8.0"
+            gcc-version: "11.3"
+            nvcc-version: "11.8"
+            openmm-version: "8.0"
+            plumed-version: "2.7"
+            python-version: "3.10"
+
+        # Oldest supported versions
+          - name: Linux (CUDA 11.2, OpenMM 7.7, PLUMED 2.7, Python 3.9)
+            os: ubuntu-22.04
+            extra-channel: ""
+            cuda-version: "11.2.2"
+            gcc-version: "10.4"
+            nvcc-version: "11.2"
+            openmm-version: "7.7"
+            plumed-version: "2.7"
             python-version: "3.9"
-            os: macos-latest
-            cuda-version: ""
-            CMAKE_FLAGS: ""
+
+          - name: MacOS (OpenMM 8.0, PLUMED 2.7, Python 3.10)
+            os: macos-11
+            python-version: "3.10"
 
     steps:
-      - uses: actions/checkout@v2
+      - name: Check out
+        uses: actions/checkout@v2
 
-      - name: "Patch conda env (if needed)"
+      - name: Install CUDA Toolkit (if needed)
+        if: startsWith(matrix.os, 'ubuntu')
+        uses: Jimver/cuda-toolkit@v0.2.10
+        with:
+          cuda: ${{ matrix.cuda-version }}
+          linux-local-args: '["--toolkit", "--override"]' # Need to install CUDA 10.2
+
+      - name: Install MacOS SDK (if needed)
+        if: startsWith(matrix.os, 'macos')
+        run: source devtools/scripts/install_macos_sdk.sh
+
+      - name: Prepare dependencies (if needed)
         if: startsWith(matrix.os, 'ubuntu')
         run: |
-          sed -i -e "s/@CDT_NAME@/${{ matrix.cdt-name }}/g" \
-                 -e "s/@GCC_VERSION@/${{ matrix.gcc-version }}.*/g" \
-                 -e "s/@CUDATOOLKIT_VERSION@/${{ matrix.cuda-version }}.*/g" \
+          sed -i -e "/cudatoolkit/c\  - cudatoolkit ${{ matrix.cuda-version }}" \
+                 -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc-version }}" \
+                 -e "/nvcc_linux-64/c\  - nvcc_linux-64 ${{ matrix.nvcc-version }}" \
+                 -e "/openmm/c\  - openmm ${{ matrix.openmm-version }}" \
+                 -e "/plumed/c\  - plumed ${{ matrix.plumed-version }}" \
+                 -e "/python/c\  - python ${{ matrix.python-version }}" \
                  devtools/conda-envs/build-${{ matrix.os }}.yml
 
-      - uses: conda-incubator/setup-miniconda@v2
-        name: "Prepare base dependencies"
+      - name: Add an extra channel (if needed)
+        if: startsWith(matrix.os, 'ubuntu') && matrix.extra-channel != ''
+        run: |
+          sed -i -e "/^channels:$/a \ \ - ${{ matrix.extra-channel }}" \
+                 devtools/conda-envs/build-${{ matrix.os }}.yml
+
+      - name: Show the environment file
+        run: cat devtools/conda-envs/build-${{ matrix.os }}.yml
+
+      - name: Install dependencies
+        uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: ${{ matrix.python-version }}
           activate-environment: build
@@ -59,99 +104,45 @@ jobs:
           auto-activate-base: false
           channels: conda-forge
 
-      - name: "Install CUDA on Ubuntu (if needed)"
-        if: matrix.cuda-version != ''
-        env:
-          CUDA_VERSION: ${{ matrix.cuda-version }}
-        run: source devtools/scripts/install_cuda.sh
-
-      - name: "Set SDK on MacOS (if needed)"
-        if: startsWith(matrix.os, 'macos')
-        run: source devtools/scripts/install_macos_sdk.sh
-
-      - name: "Conda info"
-        shell: bash -l {0}
+      - name: Conda info
         run: |
           conda info -a
           conda list
 
-      - name: Patch Plumed's Lepton location
-        shell: bash -l {0}
+      - name: Patch Plumed's Lepton
         run: |
           test -d ${CONDA_PREFIX}/include/plumed/lepton && mv ${CONDA_PREFIX}/include/plumed/lepton ${CONDA_PREFIX}/include/plumed/lepton.bak
 
-      - name: "Configure build with CMake"
-        shell: bash -l {0}
+      - name: Configure, compile, and install
         run: |
-          mkdir build
-          cd build
-
-          SHLIB_EXT=".so"
-          if [[ ${{ matrix.os }} == macos-* ]]; then
-            SHLIB_EXT=".dylib"
-          fi
+          mkdir build && cd build
 
           cmake .. \
             -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX} \
-            -DCMAKE_PREFIX_PATH=${CONDA_PREFIX} \
-            -DCMAKE_BUILD_TYPE=Release \
             -DOPENMM_DIR=${CONDA_PREFIX} \
             -DPLUMED_INCLUDE_DIR=${CONDA_PREFIX}/include/plumed \
             -DPLUMED_LIBRARY_DIR=${CONDA_PREFIX}/lib \
-            -DPLUMED_BUILD_OPENCL_LIB=ON \
-            -DOPENCL_INCLUDE_DIR=${CONDA_PREFIX}/include \
-            -DOPENCL_LIBRARY=${CONDA_PREFIX}/lib/libOpenCL${SHLIB_EXT} \
-            ${{ matrix.CMAKE_FLAGS }}
 
-      - name: "Build"
-        shell: bash -l {0}
-        run: |
-          cd build
-          make -j2 install
-          make -j2 PythonInstall
+          make install
+          make PythonInstall
 
-      - name: "Plugin information"
-        shell: bash -l {0}
+      - name: Plugin information
         run: |
           python -c "import simtk.openmm as mm; print('---Loaded---', *mm.pluginLoadedLibNames, '---Failed---', *mm.Platform.getPluginLoadFailures(), sep='\n')"
 
-      - name: "Test C++"
-        shell: bash -l {0}
+      - name: Run C++ tests on Linux
+        if: startsWith(matrix.os, 'ubuntu')
         run: |
-          set +e
           cd build
-          if [[ ${{ matrix.os }} == ubuntu-* ]]; then
-            test_files=$(find . -name "Test*" -executable -type f)
-          else
-            test_files=$(find . -name "Test*" -perm +0111 -type f)
-          fi
-          summary=""
-          exitcode=0
-          for f in $test_files; do
-            fn=$(basename $f)
-            echo "::group::$fn"
-            summary+="\n${fn}: "
-            if [[ $fn == *Cuda* ]]; then
-              echo "Skipping $fn..."
-              summary+="Skipped"
-              echo "::endgroup::"
-              continue
-            fi
-            echo "Running $fn..."
-            ./${f}
-            thisexitcode=$?
-            if [[ $thisexitcode == 0 ]]; then summary+="OK"; else summary+="FAILED"; fi
-            ((exitcode+=$thisexitcode))
-            echo "::endgroup::"
-          done
-          echo "-------"
-          echo "Summary"
-          echo "-------"
-          echo -e "${summary}"
-          exit $exitcode
+          ctest -V -E TestCuda
 
-      - name: "Test Python"
-        shell: bash -l {0}
+      - name: Run C++ tests on MacOS
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          cd build
+          ctest -V -E TestCuda -E TestOpenCL
+
+      - name: Test Python
         run: |
           cd python/tests
           pytest -v Test*

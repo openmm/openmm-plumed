@@ -1,0 +1,16 @@
+name: build
+channels:
+  - conda-forge
+dependencies:
+# build
+  - cmake >=3.20
+  - compilers
+  - make
+  - pip
+  - swig
+# host
+  - openmm 8.0
+  - plumed 2.7
+  - python 3.10
+# test
+  - pytest
