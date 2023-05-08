@@ -92,7 +92,7 @@ jobs:
           sed -i -e "/^channels:$/a   - ${{ matrix.extra-channel }}\n" \
                  devtools/conda-envs/build-${{ matrix.os }}.yml
 
-      - nane: Show the environment file
+      - name: Show the environment file
         run: cat devtools/conda-envs/build-${{ matrix.os }}.yml
 
       - name: Install dependencies
