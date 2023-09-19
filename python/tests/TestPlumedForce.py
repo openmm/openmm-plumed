@@ -1,5 +1,5 @@
 import openmm as mm
-import unit as unit
+import openmm.unit as unit
 from openmmplumed import PlumedForce
 import numpy as np
 import unittest
