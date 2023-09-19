@@ -1,5 +1,5 @@
-import simtk.openmm as mm
-import simtk.unit as unit
+import openmm as mm
+import unit as unit
 from openmmplumed import PlumedForce
 import numpy as np
 import unittest
