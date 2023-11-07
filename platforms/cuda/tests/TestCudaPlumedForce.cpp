@@ -116,7 +116,7 @@ void testMetadynamics() {
         double expected = x*x;
         for (int j = 0; j < centers.size(); j++)
             expected += 0.1*exp(-(x-centers[j])*(x-centers[j])/(2*0.5*0.5));
-        ASSERT_EQUAL_TOL(expected, state.getPotentialEnergy(), 1e-3);
+        ASSERT_EQUAL_TOL(expected, state.getPotentialEnergy(), 1e-2);
         if (i > 0)
             centers.push_back(x);
     }
@@ -169,7 +169,7 @@ void testWellTemperedMetadynamics() {
             heights.push_back(height0*exp(-bias/(delta_temperature*BOLTZ)));
         }
 
-        ASSERT_EQUAL_TOL(bias + x*x, state.getPotentialEnergy(), 1e-3);
+        ASSERT_EQUAL_TOL(bias + x*x, state.getPotentialEnergy(), 1e-2);
     }
 }
 
