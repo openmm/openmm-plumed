@@ -195,7 +195,7 @@ void OpenCLCalcPlumedForceKernel::executeOnWorkerThread() {
         plumed_cmd(plumedmain, "setBox", &boxVectors[0][0]);
     }
     double virial[9];
-    plumed_cmd(plumedmain, "setVirial", &virial);
+    plumed_cmd(plumedmain, "setVirial", &virial[0]);
 
     // Calculate the forces and energy.
 
