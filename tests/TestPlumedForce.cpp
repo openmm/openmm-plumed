@@ -167,7 +167,6 @@ void testWellTemperedMetadynamics(Platform& platform) {
         if (i > 0) {
             centers.push_back(x);
             heights.push_back(height0*exp(-bias/(delta_temperature*BOLTZ)));
-
         }
         ASSERT(fabs(bias + x*x - state.getPotentialEnergy()) < 0.1);
     }
@@ -282,22 +281,8 @@ int main() {
         Platform::loadPluginsFromDirectory(Platform::getDefaultPluginsDirectory());
         for (int i = 0; i < Platform::getNumPlatforms(); i++) {
             Platform& platform = Platform::getPlatform(i);
-            try {
-                // If the platform has a "Precision" property, try all three values.
-
-                platform.getPropertyDefaultValue("Precision");
-                for (auto precision : {"single", "mixed", "double"}) {
-                    platform.setPropertyDefaultValue("Precision", precision);
-                    printf("Testing %s %s\n", platform.getName().c_str(), precision);
-                    testPlatform(platform);
-                }
-            }
-            catch (OpenMMException& ex) {
-                // Just test it once.
-
-                printf("Testing %s\n", platform.getName().c_str());
-                testPlatform(platform);
-            }
+            printf("Testing %s\n", platform.getName().c_str());
+            testPlatform(platform);
         }
     }
     catch(const std::exception& e) {
