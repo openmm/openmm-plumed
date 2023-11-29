@@ -1,7 +1,6 @@
 from distutils.core import setup
 from distutils.extension import Extension
 import os
-import sys
 import platform
 
 openmm_dir = '@OPENMM_DIR@'
@@ -9,7 +8,7 @@ openmmplumed_header_dir = '@OPENMMPLUMED_HEADER_DIR@'
 openmmplumed_library_dir = '@OPENMMPLUMED_LIBRARY_DIR@'
 
 # setup extra compile and link arguments on Mac
-extra_compile_args = []
+extra_compile_args=['-std=c++11']
 extra_link_args = []
 
 if platform.system() == 'Darwin':
@@ -26,7 +25,7 @@ extension = Extension(name='_openmmplumed',
                      )
 
 setup(name='OpenMMPlumed',
-      version='1.0',
+      version='2.0',
       py_modules=['openmmplumed'],
       ext_modules=[extension],
      )

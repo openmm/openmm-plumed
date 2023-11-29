@@ -43,15 +43,9 @@ files and libraries are installed.
 6. Set CMAKE_INSTALL_PREFIX to the directory where the plugin should be installed.  Usually,
 this will be the same as OPENMM_DIR, so the plugin will be added to your OpenMM installation.
 
-7. If you plan to build the OpenCL platform, make sure that OPENCL_INCLUDE_DIR and
-OPENCL_LIBRARY are set correctly, and that PLUMED_BUILD_OPENCL_LIB is selected.
+7. Press "Configure" again if necessary, then press "Generate".
 
-8. If you plan to build the CUDA platform, make sure that CUDA_TOOLKIT_ROOT_DIR is set correctly
-and that PLUMED_BUILD_CUDA_LIB is selected.
-
-9. Press "Configure" again if necessary, then press "Generate".
-
-10. Use the build system you selected to build and install the plugin.  For example, if you
+8. Use the build system you selected to build and install the plugin.  For example, if you
 selected Unix Makefiles, type `make install` to install the plugin, and `make PythonInstall` to
 install the Python wrapper.
 
@@ -81,7 +75,7 @@ Simbios, the NIH National Center for Physics-Based Simulation of
 Biological Structures at Stanford, funded under the NIH Roadmap for
 Medical Research, grant U54 GM072970. See https://simtk.org.
 
-Portions copyright (c) 2016 Stanford University and the Authors.
+Portions copyright (c) 2016-2023 Stanford University and the Authors.
 
 Authors: Peter Eastman
 

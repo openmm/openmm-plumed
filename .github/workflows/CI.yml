@@ -22,21 +22,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Linux CPU CUDA 11.0 Python 3.6
-            python-version: "3.6"
+          - name: Linux CPU Python 3.12
+            python-version: "3.12"
             os: ubuntu-latest
             gcc-version: "9"
-            cuda-version: "11.0"
-            cdt-name: cos7  # CentOS sysroot: cuda 10.x needs cos6, 11+ needs cos7
-            CMAKE_FLAGS: |
-              -DPLUMED_BUILD_CUDA_LIB=ON \
-              -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda \
-              -DEXTRA_COMPILE_FLAGS="-L/usr/local/cuda/lib64/stubs -Wl,-rpath,/usr/local/cuda/lib64/stubs -Wl,-rpath-link,/usr/local/cuda/lib64/stubs"
+            cdt-name: cos7
 
-          - name: MacOS Intel CPU OpenCL Python 3.9
-            python-version: "3.9"
+          - name: MacOS Intel CPU OpenCL Python 3.10
+            python-version: "3.10"
             os: macos-latest
-            cuda-version: ""
             CMAKE_FLAGS: ""
 
     steps:
@@ -47,7 +41,6 @@ jobs:
         run: |
           sed -i -e "s/@CDT_NAME@/${{ matrix.cdt-name }}/g" \
                  -e "s/@GCC_VERSION@/${{ matrix.gcc-version }}.*/g" \
-                 -e "s/@CUDATOOLKIT_VERSION@/${{ matrix.cuda-version }}.*/g" \
                  devtools/conda-envs/build-${{ matrix.os }}.yml
 
       - uses: conda-incubator/setup-miniconda@v2
@@ -58,12 +51,6 @@ jobs:
           environment-file: devtools/conda-envs/build-${{ matrix.os }}.yml
           auto-activate-base: false
           channels: conda-forge
-
-      - name: "Install CUDA on Ubuntu (if needed)"
-        if: matrix.cuda-version != ''
-        env:
-          CUDA_VERSION: ${{ matrix.cuda-version }}
-        run: source devtools/scripts/install_cuda.sh
 
       - name: "Set SDK on MacOS (if needed)"
         if: startsWith(matrix.os, 'macos')
@@ -98,9 +85,6 @@ jobs:
             -DOPENMM_DIR=${CONDA_PREFIX} \
             -DPLUMED_INCLUDE_DIR=${CONDA_PREFIX}/include/plumed \
             -DPLUMED_LIBRARY_DIR=${CONDA_PREFIX}/lib \
-            -DPLUMED_BUILD_OPENCL_LIB=ON \
-            -DOPENCL_INCLUDE_DIR=${CONDA_PREFIX}/include \
-            -DOPENCL_LIBRARY=${CONDA_PREFIX}/lib/libOpenCL${SHLIB_EXT} \
             ${{ matrix.CMAKE_FLAGS }}
 
       - name: "Build"
@@ -131,12 +115,6 @@ jobs:
             fn=$(basename $f)
             echo "::group::$fn"
             summary+="\n${fn}: "
-            if [[ $fn == *Cuda* ]]; then
-              echo "Skipping $fn..."
-              summary+="Skipped"
-              echo "::endgroup::"
-              continue
-            fi
             echo "Running $fn..."
             ./${f}
             thisexitcode=$?

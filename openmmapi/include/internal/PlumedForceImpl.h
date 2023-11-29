@@ -33,8 +33,9 @@
  * -------------------------------------------------------------------------- */
 
 #include "PlumedForce.h"
-#include "openmm/internal/ForceImpl.h"
-#include "openmm/Kernel.h"
+#include "openmm/internal/ContextImpl.h"
+#include "openmm/internal/CustomCPPForceImpl.h"
+#include "wrapper/Plumed.h"
 #include <utility>
 #include <set>
 #include <string>
@@ -47,7 +48,7 @@ class System;
  * This is the internal implementation of PlumedForce.
  */
 
-class OPENMM_EXPORT_PLUMED PlumedForceImpl : public OpenMM::ForceImpl {
+class OPENMM_EXPORT_PLUMED PlumedForceImpl : public OpenMM::CustomCPPForceImpl {
 public:
     PlumedForceImpl(const PlumedForce& owner);
     ~PlumedForceImpl();
@@ -55,18 +56,13 @@ public:
     const PlumedForce& getOwner() const {
         return owner;
     }
-    void updateContextState(OpenMM::ContextImpl& context, bool& forcesInvalid) {
-        // This force field doesn't update the state directly.
-    }
-    double calcForcesAndEnergy(OpenMM::ContextImpl& context, bool includeForces, bool includeEnergy, int groups);
-    std::map<std::string, double> getDefaultParameters() {
-        return std::map<std::string, double>(); // This force field doesn't define any parameters.
-    }
-    std::vector<std::string> getKernelNames();
-    void updateParametersInContext(OpenMM::ContextImpl& context);
+    double computeForce(OpenMM::ContextImpl& context, const std::vector<OpenMM::Vec3>& positions, std::vector<OpenMM::Vec3>& forces);
 private:
     const PlumedForce& owner;
-    OpenMM::Kernel kernel;
+    plumed plumedmain;
+    bool hasInitialized, usesPeriodic;
+    int lastStepIndex;
+    std::vector<double> masses, charges;
 };
 
 } // namespace PlumedPlugin
