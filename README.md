@@ -8,7 +8,7 @@ OpenMM PLUMED Plugin
 This project provides a connection between [OpenMM](http://openmm.org) and [PLUMED](http://www.plumed.org).
 It allows you to bias or analyze an OpenMM simulation based on collective variables.
 
-This plugin requires PLUMED version 2.3b or greater.
+This plugin requires PLUMED version 2.3b or greater. OpenMM 8.1.0 or greater is required to use v2.0 of this plugin. For previous versions of OpenMM you may use v1.0.
 
 Installing The Plugin
 =====================
