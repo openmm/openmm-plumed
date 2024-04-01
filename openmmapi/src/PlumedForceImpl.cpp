@@ -139,6 +139,7 @@ double PlumedForceImpl::computeForce(ContextImpl& context, const vector<Vec3>& p
 
     // Calculate the forces and energy.
 
+    memset(&forces[0], 0, forces.size()*sizeof(Vec3));
     plumed_cmd(plumedmain, "prepareCalc", NULL);
     plumed_cmd(plumedmain, "performCalcNoUpdate", NULL);
     if (step != lastStepIndex) {
