@@ -21,6 +21,9 @@ class TestTorchForce(unittest.TestCase):
             BIASVALUE ARG=d
         '''
         force = PlumedForce(script)
+        force.setTemperature(310)
+        force.setMasses([1.0, 2.0, 3.0, 4.0])
+        force.setRestart(False)
         system.addForce(force)
         integ = mm.LangevinIntegrator(300.0, 1.0, 1.0)
         context = mm.Context(system, integ, mm.Platform.getPlatformByName('Reference'))
@@ -37,6 +40,9 @@ class TestTorchForce(unittest.TestCase):
         self.assertTrue(np.allclose(zero, state.getForces(asNumpy=True)[1]))
         self.assertTrue(np.allclose(delta/dist, state.getForces(asNumpy=True)[2]))
         self.assertTrue(np.allclose(zero, state.getForces(asNumpy=True)[3]))
+        self.assertEqual(310, force.getTemperature())
+        self.assertTrue(np.allclose([1.0, 2.0, 3.0, 4.0], force.getMasses()))
+        self.assertFalse(force.getRestart())
 
 
 if __name__ == '__main__':
