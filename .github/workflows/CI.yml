@@ -36,26 +36,26 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: "Patch conda env (if needed)"
-        if: startsWith(matrix.os, 'ubuntu')
-        run: |
-          sed -i -e "s/@CDT_NAME@/${{ matrix.cdt-name }}/g" \
-                 -e "s/@GCC_VERSION@/${{ matrix.gcc-version }}.*/g" \
-                 devtools/conda-envs/build-${{ matrix.os }}.yml
-
-      - uses: conda-incubator/setup-miniconda@v2
-        name: "Prepare base dependencies"
-        with:
-          python-version: ${{ matrix.python-version }}
-          activate-environment: build
-          environment-file: devtools/conda-envs/build-${{ matrix.os }}.yml
-          auto-activate-base: false
-          channels: conda-forge
-
-      - name: "Set SDK on MacOS (if needed)"
-        if: startsWith(matrix.os, 'macos')
-        run: source devtools/scripts/install_macos_sdk.sh
-
+#      - name: "Patch conda env (if needed)"
+#        if: startsWith(matrix.os, 'ubuntu')
+#        run: |
+#          sed -i -e "s/@CDT_NAME@/${{ matrix.cdt-name }}/g" \
+#                 -e "s/@GCC_VERSION@/${{ matrix.gcc-version }}.*/g" \
+#                 devtools/conda-envs/build-${{ matrix.os }}.yml
+#
+#      - uses: conda-incubator/setup-miniconda@v2
+#        name: "Prepare base dependencies"
+#        with:
+#          python-version: ${{ matrix.python-version }}
+#          activate-environment: build
+#          environment-file: devtools/conda-envs/build-${{ matrix.os }}.yml
+#          auto-activate-base: false
+#          channels: conda-forge
+#
+#      - name: "Set SDK on MacOS (if needed)"
+#        if: startsWith(matrix.os, 'macos')
+#        run: source devtools/scripts/install_macos_sdk.sh
+#
 #      - name: "Conda info"
 #        shell: bash -l {0}
 #        run: |
