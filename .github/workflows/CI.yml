@@ -36,100 +36,100 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-#      - name: "Patch conda env (if needed)"
-#        if: startsWith(matrix.os, 'ubuntu')
-#        run: |
-#          sed -i -e "s/@CDT_NAME@/${{ matrix.cdt-name }}/g" \
-#                 -e "s/@GCC_VERSION@/${{ matrix.gcc-version }}.*/g" \
-#                 devtools/conda-envs/build-${{ matrix.os }}.yml
-#
-#      - uses: conda-incubator/setup-miniconda@v2
-#        name: "Prepare base dependencies"
-#        with:
-#          python-version: ${{ matrix.python-version }}
-#          activate-environment: build
-#          environment-file: devtools/conda-envs/build-${{ matrix.os }}.yml
-#          auto-activate-base: false
-#          channels: conda-forge
-#
-#      - name: "Set SDK on MacOS (if needed)"
-#        if: startsWith(matrix.os, 'macos')
-#        run: source devtools/scripts/install_macos_sdk.sh
-#
-#      - name: "Conda info"
-#        shell: bash -l {0}
-#        run: |
-#          conda info -a
-#          conda list
-#
-#      - name: Patch Plumed's Lepton location
-#        shell: bash -l {0}
-#        run: |
-#          test -d ${CONDA_PREFIX}/include/plumed/lepton && mv ${CONDA_PREFIX}/include/plumed/lepton ${CONDA_PREFIX}/include/plumed/lepton.bak
-#
-#      - name: "Configure build with CMake"
-#        shell: bash -l {0}
-#        run: |
-#          mkdir build
-#          cd build
-#
-#          SHLIB_EXT=".so"
-#          if [[ ${{ matrix.os }} == macos-* ]]; then
-#            SHLIB_EXT=".dylib"
-#          fi
-#
-#          cmake .. \
-#            -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX} \
-#            -DCMAKE_PREFIX_PATH=${CONDA_PREFIX} \
-#            -DCMAKE_BUILD_TYPE=Release \
-#            -DOPENMM_DIR=${CONDA_PREFIX} \
-#            -DPLUMED_INCLUDE_DIR=${CONDA_PREFIX}/include/plumed \
-#            -DPLUMED_LIBRARY_DIR=${CONDA_PREFIX}/lib \
-#            ${{ matrix.CMAKE_FLAGS }}
-#
-#      - name: "Build"
-#        shell: bash -l {0}
-#        run: |
-#          cd build
-#          make -j2 install
-#          make -j2 PythonInstall
-#
-#      - name: "Plugin information"
-#        shell: bash -l {0}
-#        run: |
-#          python -c "import simtk.openmm as mm; print('---Loaded---', *mm.pluginLoadedLibNames, '---Failed---', *mm.Platform.getPluginLoadFailures(), sep='\n')"
-#
-#      - name: "Test C++"
-#        shell: bash -l {0}
-#        run: |
-#          set +e
-#          cd build
-#          if [[ ${{ matrix.os }} == ubuntu-* ]]; then
-#            test_files=$(find . -name "Test*" -executable -type f)
-#          else
-#            test_files=$(find . -name "Test*" -perm +0111 -type f)
-#          fi
-#          summary=""
-#          exitcode=0
-#          for f in $test_files; do
-#            fn=$(basename $f)
-#            echo "::group::$fn"
-#            summary+="\n${fn}: "
-#            echo "Running $fn..."
-#            ./${f}
-#            thisexitcode=$?
-#            if [[ $thisexitcode == 0 ]]; then summary+="OK"; else summary+="FAILED"; fi
-#            ((exitcode+=$thisexitcode))
-#            echo "::endgroup::"
-#          done
-#          echo "-------"
-#          echo "Summary"
-#          echo "-------"
-#          echo -e "${summary}"
-#          exit $exitcode
-#
-#      - name: "Test Python"
-#        shell: bash -l {0}
-#        run: |
-#          cd python/tests
-#          pytest -v Test*
+      - name: "Patch conda env (if needed)"
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sed -i -e "s/@CDT_NAME@/${{ matrix.cdt-name }}/g" \
+                 -e "s/@GCC_VERSION@/${{ matrix.gcc-version }}.*/g" \
+                 devtools/conda-envs/build-${{ matrix.os }}.yml
+
+      - uses: conda-incubator/setup-miniconda@v2
+        name: "Prepare base dependencies"
+        with:
+          python-version: ${{ matrix.python-version }}
+          activate-environment: build
+          environment-file: devtools/conda-envs/build-${{ matrix.os }}.yml
+          auto-activate-base: false
+          channels: conda-forge
+
+      - name: "Set SDK on MacOS (if needed)"
+        if: startsWith(matrix.os, 'macos')
+        run: source devtools/scripts/install_macos_sdk.sh
+
+      - name: "Conda info"
+        shell: bash -l {0}
+        run: |
+          conda info -a
+          conda list
+
+      - name: Patch Plumed's Lepton location
+        shell: bash -l {0}
+        run: |
+          test -d ${CONDA_PREFIX}/include/plumed/lepton && mv ${CONDA_PREFIX}/include/plumed/lepton ${CONDA_PREFIX}/include/plumed/lepton.bak
+
+      - name: "Configure build with CMake"
+        shell: bash -l {0}
+        run: |
+          mkdir build
+          cd build
+
+          SHLIB_EXT=".so"
+          if [[ ${{ matrix.os }} == macos-* ]]; then
+            SHLIB_EXT=".dylib"
+          fi
+
+          cmake .. \
+            -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX} \
+            -DCMAKE_PREFIX_PATH=${CONDA_PREFIX} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DOPENMM_DIR=${CONDA_PREFIX} \
+            -DPLUMED_INCLUDE_DIR=${CONDA_PREFIX}/include/plumed \
+            -DPLUMED_LIBRARY_DIR=${CONDA_PREFIX}/lib \
+            ${{ matrix.CMAKE_FLAGS }}
+
+      - name: "Build"
+        shell: bash -l {0}
+        run: |
+          cd build
+          make -j2 install
+          make -j2 PythonInstall
+
+      - name: "Plugin information"
+        shell: bash -l {0}
+        run: |
+          python -c "import simtk.openmm as mm; print('---Loaded---', *mm.pluginLoadedLibNames, '---Failed---', *mm.Platform.getPluginLoadFailures(), sep='\n')"
+
+      - name: "Test C++"
+        shell: bash -l {0}
+        run: |
+          set +e
+          cd build
+          if [[ ${{ matrix.os }} == ubuntu-* ]]; then
+            test_files=$(find . -name "Test*" -executable -type f)
+          else
+            test_files=$(find . -name "Test*" -perm +0111 -type f)
+          fi
+          summary=""
+          exitcode=0
+          for f in $test_files; do
+            fn=$(basename $f)
+            echo "::group::$fn"
+            summary+="\n${fn}: "
+            echo "Running $fn..."
+            ./${f}
+            thisexitcode=$?
+            if [[ $thisexitcode == 0 ]]; then summary+="OK"; else summary+="FAILED"; fi
+            ((exitcode+=$thisexitcode))
+            echo "::endgroup::"
+          done
+          echo "-------"
+          echo "Summary"
+          echo "-------"
+          echo -e "${summary}"
+          exit $exitcode
+
+      - name: "Test Python"
+        shell: bash -l {0}
+        run: |
+          cd python/tests
+          pytest -v Test*
