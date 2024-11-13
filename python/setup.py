@@ -26,7 +26,7 @@ extension = Extension(name='_openmmplumed',
                      )
 
 setup(name='OpenMMPlumed',
-      version='2.0',
+      version='2.1',
       py_modules=['openmmplumed'],
       ext_modules=[extension],
       install_requires=['openmm', 'numpy']
