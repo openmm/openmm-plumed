@@ -49,8 +49,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           activate-environment: build
           environment-file: devtools/conda-envs/build-${{ matrix.os }}.yml
-          auto-activate-base: false
-          channels: conda-forge
+          miniforge-variant: Mambaforge
 
       - name: "Set SDK on MacOS (if needed)"
         if: startsWith(matrix.os, 'macos')
