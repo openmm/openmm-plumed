@@ -31,7 +31,6 @@ with bz2.open(bz2_file, 'rb') as infile:
 
 # get topology info from equilibrated protein
 pdb = PDBFile('receptor_equilibrated.pdb')
-molecule = Modeller(pdb.topology,pdb.positions)
 positions=pdb.positions
 topology=pdb.topology
 
@@ -49,10 +48,8 @@ system.addForce(PlumedForce(script))
 
 integrator = LangevinIntegrator(sim_temp, 1.0/picosecond, time_step)
 
-# define the platform as OpenCL by default (since CUDA may not always exist)
-platform = openmm.Platform.getPlatformByName('OpenCL')
-platform.setPropertyDefaultValue('Precision', 'mixed')
-simulation = Simulation(pdb.topology, system, integrator, platform)
+# put everything together into a simulation object
+simulation = Simulation(pdb.topology, system, integrator)
 
 # Only use the below line if you're loading from a previous checkpoint
 # simulation.loadCheckpoint("%s.chk" % current_file)
