@@ -35,6 +35,8 @@
 #include "PlumedForce.h"
 #include "openmm/internal/ContextImpl.h"
 #include "openmm/internal/CustomCPPForceImpl.h"
+#define __PLUMED_WRAPPER_FORTRAN 0
+#define __PLUMED_WRAPPER_CXX 0
 #include "wrapper/Plumed.h"
 #include <utility>
 #include <set>
