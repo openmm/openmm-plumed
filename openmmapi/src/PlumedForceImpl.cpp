@@ -129,8 +129,8 @@ double PlumedForceImpl::computeForce(ContextImpl& context, const vector<Vec3>& p
     vector<Vec3>& pos = const_cast<vector<Vec3>&>(positions);
     plumed_cmd(plumedmain, "setPositions", &pos[0][0]);
     plumed_cmd(plumedmain, "setForces", &forces[0][0]);
+    Vec3 boxVectors[3];
     if (usesPeriodic) {
-        Vec3 boxVectors[3];
         context.getPeriodicBoxVectors(boxVectors[0], boxVectors[1], boxVectors[2]);
         plumed_cmd(plumedmain, "setBox", &boxVectors[0][0]);
     }
